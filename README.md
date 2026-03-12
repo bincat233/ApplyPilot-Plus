@@ -214,7 +214,7 @@ applypilot apply --headless             # Headless browser mode
 applypilot apply --remove-expired       # Remove expired jobs from the DB
 applypilot apply --reset-in-progress    # Clear stale in-progress locks
 applypilot apply --url URL              # Apply to a specific job
-applypilot status                       # Pipeline statistics
+applypilot status                       # Pipeline statistics with per-stage progress
 applypilot dashboard                    # Open HTML results dashboard
 ```
 

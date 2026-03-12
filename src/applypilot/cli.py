@@ -49,6 +49,42 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+def _build_stage_progress_rows(stats: dict) -> list[tuple[str, int, int, int]]:
+    """Build stage-oriented (total, pending, completed) rows for status output."""
+    enrich_pending = stats["pending_detail"]
+    enrich_total = stats["total"]
+    enrich_completed = max(enrich_total - enrich_pending, 0)
+
+    score_pending = stats["unscored"]
+    score_completed = stats["scored"]
+    score_total = score_pending + score_completed
+
+    tailor_pending = stats["untailored_eligible"]
+    tailor_completed = stats["tailored"]
+    tailor_total = tailor_pending + tailor_completed
+
+    cover_pending = max(tailor_completed - stats["with_cover_letter"], 0)
+    cover_completed = stats["with_cover_letter"]
+    cover_total = cover_pending + cover_completed
+
+    pdf_pending = max(tailor_completed - stats["ready_to_apply"], 0)
+    pdf_completed = stats["ready_to_apply"]
+    pdf_total = pdf_pending + pdf_completed
+
+    apply_pending = max(stats["ready_to_apply"] - stats["applied"], 0)
+    apply_completed = stats["applied"]
+    apply_total = apply_pending + apply_completed
+
+    return [
+        ("Enrichment", enrich_total, enrich_pending, enrich_completed),
+        ("Scoring", score_total, score_pending, score_completed),
+        ("Tailoring (7+)", tailor_total, tailor_pending, tailor_completed),
+        ("Cover Letters", cover_total, cover_pending, cover_completed),
+        ("PDF Conversion", pdf_total, pdf_pending, pdf_completed),
+        ("Applications", apply_total, apply_pending, apply_completed),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -374,6 +410,17 @@ def status() -> None:
     summary.add_row("Apply errors", str(stats["apply_errors"]))
 
     console.print(summary)
+
+    progress = Table(title="\nStage Progress", show_header=True, header_style="bold green")
+    progress.add_column("Stage", style="bold")
+    progress.add_column("Total", justify="right")
+    progress.add_column("Pending", justify="right")
+    progress.add_column("Completed", justify="right")
+
+    for category, total, pending, completed in _build_stage_progress_rows(stats):
+        progress.add_row(category, str(total), str(pending), str(completed))
+
+    console.print(progress)
 
     # Score distribution
     if stats["score_distribution"]:
