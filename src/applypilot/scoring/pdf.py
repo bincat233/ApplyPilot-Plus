@@ -355,6 +355,17 @@ def render_pdf(html: str, output_path: str) -> None:
         browser.close()
 
 
+def _render_pdf_with_page(page, html: str, output_path: str) -> None:
+    """Render HTML to PDF using an existing Playwright page."""
+    page.set_content(html, wait_until="networkidle")
+    page.pdf(
+        path=output_path,
+        format="Letter",
+        margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+        print_background=True,
+    )
+
+
 # ── Public API ───────────────────────────────────────────────────────────
 
 def convert_to_pdf(
@@ -429,12 +440,26 @@ def batch_convert(limit: int = 50) -> int:
 
     log.info("Converting %d files to PDF...", len(to_convert))
     converted = 0
-    for f in to_convert:
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
         try:
-            convert_to_pdf(f)
-            converted += 1
-        except Exception as e:
-            log.error("Failed to convert %s: %s", f.name, e)
+            page = browser.new_page()
+            for f in to_convert:
+                try:
+                    text = f.read_text(encoding="utf-8")
+                    resume = parse_resume(text)
+                    html = build_html(resume)
+                    out = f.with_suffix(".pdf")
+                    _render_pdf_with_page(page, html, str(out))
+                    log.info("PDF generated: %s", out)
+                    converted += 1
+                except Exception as e:
+                    log.error("Failed to convert %s: %s", f.name, e)
+        finally:
+            browser.close()
 
     log.info("Done: %d/%d PDFs generated in %s", converted, len(to_convert), TAILORED_DIR)
     return converted
