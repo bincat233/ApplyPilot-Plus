@@ -498,6 +498,14 @@ def run_tailoring(min_score: int = 7, limit: int = 20,
 
     for job in jobs:
         completed += 1
+        log.info(
+            "%d/%d [START] score=%s | %s | %s",
+            completed,
+            len(jobs),
+            job.get("fit_score", "?"),
+            job["site"],
+            job["title"][:60],
+        )
         try:
             tailored, report = tailor_resume(resume_text, job, profile,
                                              validation_mode=validation_mode)
