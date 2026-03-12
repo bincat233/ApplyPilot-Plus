@@ -203,6 +203,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, 
 
 ## Upstream Contributions Merged Here
 
+- [#7](https://github.com/Pickle-Pixel/ApplyPilot/pull/7) by [@cbrooker](https://github.com/cbrooker): Add submitted and failed application tables to the HTML dashboard
 - [#28](https://github.com/Pickle-Pixel/ApplyPilot/pull/28) by OpenClaw Bot: Add `SECURITY.md`
 - [#31](https://github.com/Pickle-Pixel/ApplyPilot/pull/31) by [@vivekshekharrai-del](https://github.com/vivekshekharrai-del): Fix UnicodeEncodeError in `doctor` on Windows
 
