@@ -146,6 +146,13 @@ API keys and runtime config: `GEMINI_API_KEY`, `LLM_MODEL`, `CAPSOLVER_API_KEY` 
 ### Discover
 Queries Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs via JobSpy. Fetches from 129 Greenhouse ATS employers. Scrapes 48 Workday employer portals (configurable in `employers.yaml`). Hits 30 direct career sites with custom extractors. Deduplicates by URL.
 
+For targeted debugging or source-specific refreshes, you can limit discovery to selected `sites.yaml` entries:
+
+```bash
+applypilot run discover --site-filter Lensa
+applypilot run discover --site-filter Lensa --site-filter Dice
+```
+
 ### Enrich
 Visits each job URL and extracts the full description. 3-tier cascade: JSON-LD structured data, then CSS selector patterns, then AI-powered extraction for unknown layouts.
 
@@ -183,6 +190,7 @@ applypilot run --workers 4              # Parallel discovery/enrichment
 applypilot run --stream                 # Concurrent stages (streaming mode)
 applypilot run --min-score 8            # Override score threshold
 applypilot run --dry-run                # Preview without executing
+applypilot run discover --site-filter Lensa  # Only run smart extract for matching sites
 applypilot run --validation lenient     # Relax validation (recommended for Gemini free tier)
 applypilot run --validation strict      # Strictest validation (retries on any banned word)
 applypilot apply                        # Launch auto-apply
