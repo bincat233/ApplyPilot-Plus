@@ -11,6 +11,8 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from applypilot import config
@@ -32,6 +34,26 @@ def _normalize_profile_directory(profile_directory: str | None) -> str:
     if "/" in profile or "\\" in profile or profile in {".", ".."}:
         raise ValueError("Chrome profile directory must be a simple directory name like 'Default' or 'Profile 1'.")
     return profile
+
+
+def _is_cdp_ready(port: int, timeout: float = 1.5) -> bool:
+    """Return True if Chrome DevTools endpoint is reachable on the given port."""
+    url = f"http://127.0.0.1:{port}/json/version"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return 200 <= resp.status < 300
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        return False
+
+
+def _wait_for_cdp(port: int, max_wait_sec: float = 12.0) -> bool:
+    """Poll briefly for the Chrome DevTools endpoint to become available."""
+    deadline = time.time() + max_wait_sec
+    while time.time() < deadline:
+        if _is_cdp_ready(port):
+            return True
+        time.sleep(0.25)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -261,11 +283,21 @@ def launch_chrome(worker_id: int, port: int | None = None,
     with _chrome_lock:
         _chrome_procs[worker_id] = proc
 
-    # Give Chrome time to start and open the debug port
-    time.sleep(3)
-    logger.info("[worker-%d] Chrome started on port %d (pid %d)",
-                worker_id, port, proc.pid)
-    return proc
+    if _wait_for_cdp(port):
+        logger.info("[worker-%d] Chrome started on port %d (pid %d)",
+                    worker_id, port, proc.pid)
+        return proc
+
+    logger.warning(
+        "[worker-%d] Chrome launched but CDP endpoint not reachable on port %d.",
+        worker_id,
+        port,
+    )
+    if proc.poll() is None:
+        _kill_process_tree(proc.pid)
+    with _chrome_lock:
+        _chrome_procs.pop(worker_id, None)
+    raise RuntimeError(f"Chrome CDP unavailable on port {port}.")
 
 
 def cleanup_worker(worker_id: int, process: subprocess.Popen | None) -> None:

@@ -60,6 +60,7 @@ def test_launch_chrome_uses_selected_profile_directory(monkeypatch) -> None:
     monkeypatch.setattr(chrome, "setup_worker_profile", lambda worker_id, profile_directory=None: profile_dir)
     monkeypatch.setattr(chrome, "_kill_on_port", lambda port: None)
     monkeypatch.setattr(chrome, "_suppress_restore_nag", lambda profile_dir, profile_directory=None: None)
+    monkeypatch.setattr(chrome, "_wait_for_cdp", lambda port, max_wait_sec=12.0: True)
     monkeypatch.setattr(chrome.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(chrome.time, "sleep", lambda seconds: None)
 
