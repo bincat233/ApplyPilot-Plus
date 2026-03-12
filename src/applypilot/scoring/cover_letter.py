@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from applypilot.config import COVER_LETTER_DIR, RESUME_PATH, load_profile
 from applypilot.database import get_connection, get_jobs_by_stage
@@ -198,6 +199,9 @@ def run_cover_letters(min_score: int = 7, limit: int = 20,
         {"generated": int, "errors": int, "elapsed": float}
     """
     profile = load_profile()
+    if not RESUME_PATH.exists():
+        log.error("Resume file not found: %s. Run 'applypilot init' first.", RESUME_PATH)
+        return {"generated": 0, "errors": 0, "elapsed": 0.0}
     resume_text = RESUME_PATH.read_text(encoding="utf-8")
     conn = get_connection()
 
@@ -234,8 +238,14 @@ def run_cover_letters(min_score: int = 7, limit: int = 20,
     for job in jobs:
         completed += 1
         try:
-            letter = generate_cover_letter(resume_text, job, profile,
-                                          validation_mode=validation_mode)
+            tailored_path = job.get("tailored_resume_path")
+            if tailored_path and Path(tailored_path).exists():
+                job_resume = Path(tailored_path).read_text(encoding="utf-8")
+            else:
+                job_resume = resume_text
+            letter = generate_cover_letter(
+                job_resume, job, profile, validation_mode=validation_mode
+            )
 
             # Build safe filename prefix
             safe_title = re.sub(r"[^\w\s-]", "", job["title"])[:50].strip().replace(" ", "_")
