@@ -201,13 +201,7 @@ applypilot dashboard                    # Open HTML results dashboard
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and PR guidelines.
 
-## Upstream Contributions Merged Here
-
-- [#25](https://github.com/Pickle-Pixel/ApplyPilot/pull/25) by [@rothnic](https://github.com/rothnic): Add Greenhouse ATS discovery, employer registry, and Greenhouse CLI tools
-- [#8](https://github.com/Pickle-Pixel/ApplyPilot/pull/8) by [@cbrooker](https://github.com/cbrooker): Add applied and failed indicators to HTML dashboard job cards, plus one-click auto-apply command copy
-- [#7](https://github.com/Pickle-Pixel/ApplyPilot/pull/7) by [@cbrooker](https://github.com/cbrooker): Add submitted and failed application tables to the HTML dashboard
-- [#28](https://github.com/Pickle-Pixel/ApplyPilot/pull/28) by OpenClaw Bot: Add `SECURITY.md`
-- [#31](https://github.com/Pickle-Pixel/ApplyPilot/pull/31) by [@vivekshekharrai-del](https://github.com/vivekshekharrai-del): Fix UnicodeEncodeError in `doctor` on Windows
+Merged upstream work and pending reviews are tracked in [issue #1](https://github.com/bincat233/ApplyPilot-Plus/issues/1).
 
 ---
 
