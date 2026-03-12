@@ -111,7 +111,15 @@ BULLETS: Strong verb + what you built + quantified impact. Vary verbs (Built, De
 
 ## OUTPUT: Return ONLY valid JSON. No markdown fences. No commentary. No "here is" preamble.
 
-{{"title":"Role Title","summary":"2-3 tailored sentences.","skills":{{"Languages":"...","Frameworks":"...","DevOps & Infra":"...","Databases":"...","Tools":"..."}},"experience":[{{"header":"Title at Company","subtitle":"Tech | Dates","bullets":["bullet 1","bullet 2","bullet 3","bullet 4"]}}],"projects":[{{"header":"Project Name - Description","subtitle":"Tech | Dates","bullets":["bullet 1","bullet 2"]}}],"education":"{school} | {education_level}"}}"""
+For each EXPERIENCE entry:
+- "title" must be the role title only
+- "company_dates" must contain the company name and dates
+
+For each PROJECTS entry:
+- "title" must be the project name or project title
+- "tech_dates" must contain tech stack, dates, or other short metadata
+
+{{"title":"Role Title","summary":"2-3 tailored sentences.","skills":{{"Languages":"...","Frameworks":"...","DevOps & Infra":"...","Databases":"...","Tools":"..."}},"experience":[{{"title":"Role Title","company_dates":"Company Name | Dates","bullets":["bullet 1","bullet 2","bullet 3","bullet 4"]}}],"projects":[{{"title":"Project Name - Description","tech_dates":"Tech | Dates","bullets":["bullet 1","bullet 2"]}}],"education":"{school} | {education_level}"}}"""
 
 
 def _build_judge_prompt(profile: dict) -> str:
@@ -270,9 +278,9 @@ def assemble_resume_text(data: dict, profile: dict) -> str:
     # Experience
     lines.append("EXPERIENCE")
     for entry in data.get("experience", []):
-        lines.append(sanitize_text(entry.get("header", "")))
-        if entry.get("subtitle"):
-            lines.append(sanitize_text(entry["subtitle"]))
+        lines.append(sanitize_text(entry.get("title", "")))
+        if entry.get("company_dates"):
+            lines.append(sanitize_text(entry["company_dates"]))
         for b in entry.get("bullets", []):
             lines.append(f"- {sanitize_text(b)}")
         lines.append("")
@@ -282,9 +290,9 @@ def assemble_resume_text(data: dict, profile: dict) -> str:
     if projects:
         lines.append("PROJECTS")
         for entry in projects:
-            lines.append(sanitize_text(entry.get("header", "")))
-            if entry.get("subtitle"):
-                lines.append(sanitize_text(entry["subtitle"]))
+            lines.append(sanitize_text(entry.get("title", "")))
+            if entry.get("tech_dates"):
+                lines.append(sanitize_text(entry["tech_dates"]))
             for b in entry.get("bullets", []):
                 lines.append(f"- {sanitize_text(b)}")
             lines.append("")

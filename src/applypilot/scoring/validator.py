@@ -134,14 +134,14 @@ def validate_json_fields(data: dict, profile: dict, mode: str = "normal") -> dic
             if fake in skills_text:
                 errors.append(f"Fabricated skill: '{fake}'")
 
-    # Experience: preserved companies must be present (always enforced)
+    # Experience: preserved companies must be present in the company/date line.
     resume_facts = profile.get("resume_facts", {})
     preserved_companies = resume_facts.get("preserved_companies", [])
 
     if isinstance(data["experience"], list):
         for company in preserved_companies:
             has_company = any(
-                company.lower() in str(e.get("header", "")).lower()
+                company.lower() in str(e.get("company_dates", "")).lower()
                 for e in data["experience"]
             )
             if not has_company:

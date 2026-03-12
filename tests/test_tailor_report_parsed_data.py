@@ -22,7 +22,7 @@ def test_tailor_report_keeps_last_parsed_json(monkeypatch) -> None:
         "title": "Software Engineer",
         "summary": "Practical engineer.",
         "skills": {"Languages": "Python"},
-        "experience": [{"header": "Engineer at Example Co", "bullets": ["Built APIs"]}],
+        "experience": [{"title": "Engineer", "company_dates": "Example Co | 2022-Present", "bullets": ["Built APIs"]}],
         "education": "State University | BS",
     }
 
@@ -30,7 +30,7 @@ def test_tailor_report_keeps_last_parsed_json(monkeypatch) -> None:
         @staticmethod
         def chat(messages, max_output_tokens=16000):
             _ = messages, max_output_tokens
-            return '{"title":"Software Engineer","summary":"Practical engineer.","skills":{"Languages":"Python"},"experience":[{"header":"Engineer at Example Co","bullets":["Built APIs"]}],"education":"State University | BS"}'
+            return '{"title":"Software Engineer","summary":"Practical engineer.","skills":{"Languages":"Python"},"experience":[{"title":"Engineer","company_dates":"Example Co | 2022-Present","bullets":["Built APIs"]}],"education":"State University | BS"}'
 
     monkeypatch.setattr(tailor, "get_client", lambda: FakeClient())
     monkeypatch.setattr(tailor, "extract_json", lambda raw: parsed)

@@ -28,7 +28,7 @@ def test_validate_json_fields_allows_missing_projects_key() -> None:
         "summary": "Backend-focused engineer.",
         "skills": {"Languages": "Python, JavaScript"},
         "experience": [
-            {"header": "Engineer at Example Co", "bullets": ["Built APIs"]},
+            {"title": "Engineer", "company_dates": "Example Co | 2022-Present", "bullets": ["Built APIs"]},
         ],
         "education": "State University | BS",
     }
@@ -45,7 +45,7 @@ def test_assemble_resume_text_omits_projects_section_when_absent() -> None:
         "summary": "Backend-focused engineer.",
         "skills": {"Languages": "Python, JavaScript"},
         "experience": [
-            {"header": "Engineer at Example Co", "bullets": ["Built APIs"]},
+            {"title": "Engineer", "company_dates": "Example Co | 2022-Present", "bullets": ["Built APIs"]},
         ],
         "education": "State University | BS",
     }
@@ -79,3 +79,20 @@ State University | BS
 
     assert result["passed"] is True
     assert not any("PROJECTS" in error for error in result["errors"])
+
+
+def test_validate_json_fields_accepts_preserved_company_in_company_dates() -> None:
+    data = {
+        "title": "Software Engineer",
+        "summary": "Backend-focused engineer.",
+        "skills": {"Languages": "Python, JavaScript"},
+        "experience": [
+            {"title": "Engineer", "company_dates": "Example Co | 2022-Present", "bullets": ["Built APIs"]},
+        ],
+        "education": "State University | BS",
+    }
+
+    result = validate_json_fields(data, _profile(), mode="lenient")
+
+    assert result["passed"] is True
+    assert result["errors"] == []
