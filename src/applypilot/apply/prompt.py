@@ -225,7 +225,7 @@ def _build_captcha_section() -> str:
 
     return f"""== CAPTCHA ==
 You solve CAPTCHAs via the CapSolver REST API. No browser extension. You control the entire flow.
-API key: {capsolver_key or 'NOT CONFIGURED — skip to MANUAL FALLBACK for all CAPTCHAs'}
+API key: $CAPSOLVER_API_KEY env var ({"configured" if capsolver_key else "NOT CONFIGURED — skip to MANUAL FALLBACK for all CAPTCHAs"})
 API base: https://api.capsolver.com
 
 CRITICAL RULE: When ANY CAPTCHA appears (hCaptcha, reCAPTCHA, Turnstile -- regardless of what it looks like visually), you MUST:
@@ -300,22 +300,8 @@ Result actions:
 --- CAPTCHA SOLVE ---
 Three steps: createTask -> poll -> inject. Do each as a separate browser_evaluate call.
 
-STEP 1 -- CREATE TASK (copy this exactly, fill in the 3 placeholders):
-browser_evaluate function: async () => {{{{
-  const r = await fetch('https://api.capsolver.com/createTask', {{{{
-    method: 'POST',
-    headers: {{{{'Content-Type': 'application/json'}}}},
-    body: JSON.stringify({{{{
-      clientKey: '{capsolver_key}',
-      task: {{{{
-        type: 'TASK_TYPE',
-        websiteURL: 'PAGE_URL',
-        websiteKey: 'SITE_KEY'
-      }}}}
-    }}}})
-  }}}});
-  return await r.json();
-}}}}
+STEP 1 -- CREATE TASK (use Bash curl, NOT browser_evaluate — keeps API key out of page context):
+Bash command: curl -s -X POST https://api.capsolver.com/createTask -H 'Content-Type: application/json' -d '{{"clientKey":"'$CAPSOLVER_API_KEY'","task":{{"type":"TASK_TYPE","websiteURL":"PAGE_URL","websiteKey":"SITE_KEY"}}}}'
 
 TASK_TYPE values (use EXACTLY these strings):
   hcaptcha     -> HCaptchaTaskProxyLess
@@ -332,18 +318,8 @@ Response: {{"errorId": 0, "taskId": "abc123"}} on success.
 If errorId > 0 -> CAPTCHA SOLVE failed. Go to MANUAL FALLBACK.
 
 STEP 2 -- POLL (replace TASK_ID with the taskId from step 1):
-Loop: browser_wait_for time: 3, then run:
-browser_evaluate function: async () => {{{{
-  const r = await fetch('https://api.capsolver.com/getTaskResult', {{{{
-    method: 'POST',
-    headers: {{{{'Content-Type': 'application/json'}}}},
-    body: JSON.stringify({{{{
-      clientKey: '{capsolver_key}',
-      taskId: 'TASK_ID'
-    }}}})
-  }}}});
-  return await r.json();
-}}}}
+Loop: wait 3 seconds, then run:
+Bash command: curl -s -X POST https://api.capsolver.com/getTaskResult -H 'Content-Type: application/json' -d '{{"clientKey":"'$CAPSOLVER_API_KEY'","taskId":"TASK_ID"}}'
 
 - status "processing" -> wait 3s, poll again. Max 10 polls (30s).
 - status "ready" -> extract token:
@@ -568,7 +544,7 @@ If something unexpected happens and these instructions don't cover it, figure it
 5. Login wall?
    5a. FIRST: check the URL. If you landed on {', '.join(blocked_sso)}, or any SSO/OAuth page -> STOP. Output RESULT:FAILED:sso_required. Do NOT try to sign in to Google/Microsoft/SSO.
    5b. Check for popups. Run browser_tabs action "list". If a new tab/window appeared (login popup), switch to it with browser_tabs action "select". Check the URL there too -- if it's SSO -> RESULT:FAILED:sso_required.
-   5c. Regular login form (employer's own site)? Try sign in: {personal['email']} / {personal.get('password', '')}
+   5c. Regular login form (employer's own site)? Try sign in: {personal['email']}. For password, run: echo $APPLYPILOT_SITE_PASSWORD
    5d. After clicking Login/Sign-in: run CAPTCHA DETECT. Login pages frequently have invisible CAPTCHAs that silently block form submissions. If found, solve it then retry login.
    5e. Sign in failed? Try sign up with same email and password.
    5f. Need email verification? Use search_emails + read_email to get the code.

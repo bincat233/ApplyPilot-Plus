@@ -364,6 +364,11 @@ def run_job(job: dict, port: int, worker_id: int = 0,
     env.pop("CLAUDECODE", None)
     env.pop("CLAUDE_CODE_ENTRYPOINT", None)
 
+    profile = config.load_profile()
+    pwd = profile.get("personal", {}).get("password", "")
+    if pwd:
+        env["APPLYPILOT_SITE_PASSWORD"] = pwd
+
     worker_dir = reset_worker_dir(worker_id)
 
     update_state(worker_id, status="applying", job_title=job["title"],
