@@ -87,6 +87,11 @@ def run(
     workers: int = typer.Option(1, "--workers", "-w", help="Parallel threads for discovery/enrichment stages."),
     stream: bool = typer.Option(False, "--stream", help="Run stages concurrently (streaming mode)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview stages without executing."),
+    site_filter: Optional[list[str]] = typer.Option(
+        None,
+        "--site-filter",
+        help="Limit discovery to matching sites from sites.yaml (repeat flag for multiple).",
+    ),
     validation: str = typer.Option(
         "normal",
         "--validation",
@@ -135,6 +140,7 @@ def run(
         dry_run=dry_run,
         stream=stream,
         workers=workers,
+        site_filter=site_filter,
         validation_mode=validation,
     )
 

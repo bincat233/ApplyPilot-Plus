@@ -59,9 +59,54 @@ _UPSTREAM: dict[str, str | None] = {
 # Individual stage runners
 # ---------------------------------------------------------------------------
 
-def _run_discover(workers: int = 1) -> dict:
+def _run_discover(workers: int = 1, site_filter: list[str] | None = None) -> dict:
     """Stage: Job discovery — JobSpy, Workday, and smart-extract scrapers."""
     stats: dict = {"jobspy": None, "workday": None, "smartextract": None, "greenhouse": None}
+
+    if site_filter:
+        filters = [s.strip().lower() for s in site_filter if s and s.strip()]
+        if not filters:
+            return {
+                "jobspy": "skipped (site-filter)",
+                "workday": "skipped (site-filter)",
+                "smartextract": "error: empty site-filter",
+                "greenhouse": "skipped (site-filter)",
+            }
+
+        console.print(f"  [cyan]Smart extract (filtered sites): {', '.join(site_filter)}[/cyan]")
+        try:
+            from applypilot.discovery.smartextract import load_sites, run_smart_extract
+
+            configured_sites = load_sites()
+            matched_sites: list[dict] = []
+            seen_names: set[str] = set()
+            for site in configured_sites:
+                name = str(site.get("name", "")).strip()
+                if not name:
+                    continue
+                name_lower = name.lower()
+                if any(f == name_lower or f in name_lower for f in filters):
+                    if name_lower not in seen_names:
+                        matched_sites.append(site)
+                        seen_names.add(name_lower)
+
+            if not matched_sites:
+                available = ", ".join(sorted({str(s.get("name", "")).strip() for s in configured_sites if s.get("name")})) or "none"
+                raise ValueError(f"No sites matched site-filter={site_filter}. Available sites: {available}")
+
+            run_smart_extract(sites=matched_sites, workers=workers)
+            stats["jobspy"] = "skipped (site-filter)"
+            stats["workday"] = "skipped (site-filter)"
+            stats["smartextract"] = "ok"
+            stats["greenhouse"] = "skipped (site-filter)"
+        except Exception as e:
+            log.error("Smart extract (filtered) failed: %s", e)
+            console.print(f"  [red]Smart extract error:[/red] {e}")
+            stats["jobspy"] = "skipped (site-filter)"
+            stats["workday"] = "skipped (site-filter)"
+            stats["smartextract"] = f"error: {e}"
+            stats["greenhouse"] = "skipped (site-filter)"
+        return stats
 
     # JobSpy
     console.print("  [cyan]JobSpy full crawl...[/cyan]")
@@ -273,6 +318,7 @@ def _run_stage_streaming(
     min_score: int = 7,
     workers: int = 1,
     validation_mode: str = "normal",
+    site_filter: list[str] | None = None,
 ) -> None:
     """Run a single stage in streaming mode: loop until upstream done + no work.
 
@@ -287,6 +333,8 @@ def _run_stage_streaming(
         kwargs["validation_mode"] = validation_mode
     if stage in ("discover", "enrich"):
         kwargs["workers"] = workers
+    if stage == "discover":
+        kwargs["site_filter"] = site_filter
 
     upstream = _UPSTREAM[stage]
 
@@ -335,7 +383,7 @@ def _run_stage_streaming(
 # ---------------------------------------------------------------------------
 
 def _run_sequential(ordered: list[str], min_score: int, workers: int = 1,
-                    validation_mode: str = "normal") -> dict:
+                    validation_mode: str = "normal", site_filter: list[str] | None = None) -> dict:
     """Execute stages one at a time (original behavior)."""
     results: list[dict] = []
     errors: dict[str, str] = {}
@@ -358,6 +406,8 @@ def _run_sequential(ordered: list[str], min_score: int, workers: int = 1,
                 kwargs["validation_mode"] = validation_mode
             if name in ("discover", "enrich"):
                 kwargs["workers"] = workers
+            if name == "discover":
+                kwargs["site_filter"] = site_filter
             result = runner(**kwargs)
             elapsed = time.time() - t0
 
@@ -389,7 +439,7 @@ def _run_sequential(ordered: list[str], min_score: int, workers: int = 1,
 
 
 def _run_streaming(ordered: list[str], min_score: int, workers: int = 1,
-                   validation_mode: str = "normal") -> dict:
+                   validation_mode: str = "normal", site_filter: list[str] | None = None) -> dict:
     """Execute stages concurrently with DB as conveyor belt."""
     tracker = _StageTracker()
     stop_event = threading.Event()
@@ -411,7 +461,7 @@ def _run_streaming(ordered: list[str], min_score: int, workers: int = 1,
         start_times[name] = time.time()
         t = threading.Thread(
             target=_run_stage_streaming,
-            args=(name, tracker, stop_event, min_score, workers, validation_mode),
+            args=(name, tracker, stop_event, min_score, workers, validation_mode, site_filter),
             name=f"stage-{name}",
             daemon=True,
         )
@@ -458,6 +508,7 @@ def run_pipeline(
     dry_run: bool = False,
     stream: bool = False,
     workers: int = 1,
+    site_filter: list[str] | None = None,
     validation_mode: str = "normal",
 ) -> dict:
     """Run pipeline stages.
@@ -491,6 +542,8 @@ def run_pipeline(
     ))
     console.print(f"  Min score:  {min_score}")
     console.print(f"  Workers:    {workers}")
+    if site_filter:
+        console.print(f"  Site filter:{' ' if len('Site filter:') < 11 else ''}{', '.join(site_filter)}")
     console.print(f"  Validation: {validation_mode}")
     console.print(f"  Stages:     {' -> '.join(ordered)}")
 
@@ -509,10 +562,12 @@ def run_pipeline(
     # Execute
     if stream:
         result = _run_streaming(ordered, min_score, workers=workers,
-                                validation_mode=validation_mode)
+                                validation_mode=validation_mode,
+                                site_filter=site_filter)
     else:
         result = _run_sequential(ordered, min_score, workers=workers,
-                                 validation_mode=validation_mode)
+                                 validation_mode=validation_mode,
+                                 site_filter=site_filter)
 
     # Summary table
     console.print(f"\n{'=' * 70}")
