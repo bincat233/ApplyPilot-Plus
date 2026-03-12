@@ -85,6 +85,10 @@ sites:
     url: "https://www.simplyhired.com/search?q={query_encoded}&l={location_encoded}"
     type: search
 
+  - name: "Lensa"
+    url: "https://lensa.com/talent/job-opportunities?flow=comingFromLandingPage&job-title={query_encoded}&remote_jobs=only"
+    type: search
+
   - name: "PowerToFly"
     url: "https://powertofly.com/jobs/?keywords={query_encoded}&remote=true"
     type: search

@@ -18,6 +18,7 @@ import re
 import sqlite3
 import sys
 import time
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +45,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         pass
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+_LENSA_MAX_PAGES = 10
+_LENSA_MIN_SALARY = 150_000
 
 
 # -- Location filtering -------------------------------------------------------
@@ -157,6 +160,8 @@ def collect_page_intelligence(url: str, headless: bool = True) -> dict:
                     "status": response.status,
                     "size": len(body),
                     "data": data,
+                    "request_method": response.request.method,
+                    "request_post_data": response.request.post_data,
                 })
             except Exception:
                 pass
@@ -166,8 +171,11 @@ def collect_page_intelligence(url: str, headless: bool = True) -> dict:
         page = browser.new_page(user_agent=UA)
         page.on("response", on_response)
 
-        page.goto(url, timeout=60000)
-        page.wait_for_load_state("networkidle")
+        page.goto(url, timeout=30000, wait_until="domcontentloaded")
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            log.debug("Network did not go idle for %s; continuing with current DOM", url)
 
         intel["page_title"] = page.title()
 
@@ -291,6 +299,8 @@ def collect_page_intelligence(url: str, headless: bool = True) -> dict:
             "status": resp["status"],
             "size": resp["size"],
             "_raw_data": resp.get("data"),
+            "_request_method": resp.get("request_method"),
+            "_request_post_data": resp.get("request_post_data"),
         }
         data = resp.get("data")
         if data:
@@ -336,6 +346,180 @@ def collect_page_intelligence(url: str, headless: bool = True) -> dict:
         intel["api_responses"].append(summary)
 
     return intel
+
+
+def _site_error_result(name: str, status: str, error: Exception | str) -> dict:
+    """Return a structured per-site error without aborting the batch."""
+    return {
+        "name": name,
+        "status": status,
+        "error": str(error),
+        "jobs": [],
+        "total": 0,
+        "titles": 0,
+    }
+
+
+def _parse_salary_floor(salary: str | None) -> int | None:
+    """Extract a conservative annualized floor from a salary string."""
+    if not salary:
+        return None
+    text = salary.lower().replace(",", "")
+    if "/ hr" in text or "/hour" in text or "hourly" in text:
+        numbers = [float(n) for n in re.findall(r"\$?(\d+(?:\.\d+)?)", text)]
+        if not numbers:
+            return None
+        return int(numbers[0] * 2080)
+    match = re.search(r"\$?(\d+(?:\.\d+)?)\s*k", text)
+    if match:
+        return int(float(match.group(1)) * 1000)
+    numbers = [int(n) for n in re.findall(r"\$?(\d{5,6})", text)]
+    if numbers:
+        return numbers[0]
+    return None
+
+
+def _lensa_is_flexible_work(job: dict) -> bool:
+    text = " ".join(str(job.get(k) or "") for k in ("title", "description", "salary")).lower()
+    return any(term in text for term in (
+        "part-time",
+        "part time",
+        "gig",
+        "contract",
+        "contractor",
+        "fractional",
+        "freelance",
+        "temporary",
+        "temp",
+        "consulting",
+        "consultant",
+    ))
+
+
+def _contains_term(text: str, term: str) -> bool:
+    """Match acronym/phrase terms on token boundaries instead of substrings."""
+    return re.search(rf"\b{re.escape(term)}\b", text) is not None
+
+
+def _lensa_remote_ok(job: dict) -> bool:
+    location = str(job.get("location") or "").lower()
+    text = " ".join(str(job.get(k) or "") for k in ("title", "description", "location")).lower()
+    if any(term in text for term in ("hybrid", "on-site", "onsite", "in-office", "in office")):
+        return False
+    return "remote" in location or "remote" in text
+
+
+def _lensa_title_matches_query(title: str | None, query: str | None) -> bool:
+    if not title or not query:
+        return True
+    title_norm = title.lower()
+    query_norm = query.lower()
+    leadership_terms = ("vp", "vice president", "chief", "director", "head", "svp", "avp", "cio", "cto", "ciso")
+    leadership_families = {
+        "vp": ("vp", "vice president", "head", "chief", "cio", "cto", "ciso", "svp", "avp"),
+        "vice president": ("vp", "vice president", "head", "chief", "cio", "cto", "ciso", "svp", "avp"),
+        "head": ("head", "vp", "vice president", "chief", "cio", "cto", "ciso"),
+        "chief": ("chief", "head", "vp", "vice president", "cio", "cto", "ciso"),
+        "cio": ("cio", "chief", "vp", "vice president", "head"),
+        "cto": ("cto", "chief", "vp", "vice president", "head"),
+        "ciso": ("ciso", "chief", "vp", "vice president", "head"),
+    }
+    domain_terms = {
+        "information": ("information",),
+        "technology": ("technology", "it"),
+        "security": ("security", "cybersecurity", "cyber"),
+    }
+    query_leadership = [term for term in leadership_terms if term in query_norm]
+    if query_leadership:
+        allowed_leadership: set[str] = set()
+        for term in query_leadership:
+            allowed_leadership.update(leadership_families.get(term, (term,)))
+        if not any(_contains_term(title_norm, term) for term in allowed_leadership):
+            return False
+    required_domains: list[str] = []
+    for key, terms in domain_terms.items():
+        if key in query_norm:
+            required_domains.extend(terms)
+    if required_domains and not any(term in title_norm for term in required_domains):
+        return False
+    if any(term in title_norm for term in ("consulting", "consultant")):
+        executive_terms = ("vp", "vice president", "chief", "head", "cio", "cto", "ciso", "svp", "avp")
+        if not any(_contains_term(title_norm, term) for term in executive_terms):
+            return False
+    noise_terms = ("alliances", "partnership", "partnerships", "sales", "marketing")
+    if any(term in title_norm for term in noise_terms):
+        return False
+    return True
+
+
+def _filter_lensa_jobs(jobs: list[dict], query: str | None) -> list[dict]:
+    """Apply tighter relevance, salary, and remote filters to Lensa results."""
+    filtered: list[dict] = []
+    for job in jobs:
+        if not _lensa_remote_ok(job):
+            continue
+        if not _lensa_title_matches_query(job.get("title"), query):
+            continue
+        salary_floor = _parse_salary_floor(job.get("salary"))
+        if salary_floor is not None and salary_floor < _LENSA_MIN_SALARY and not _lensa_is_flexible_work(job):
+            continue
+        filtered.append(job)
+    return filtered
+
+
+def _paginate_lensa_more_jobs_response(api_response: dict, page_url: str, max_pages: int = _LENSA_MAX_PAGES) -> dict:
+    """Fetch additional Lensa more-jobs pages and merge them into one payload."""
+    raw_data = api_response.get("_raw_data")
+    if not isinstance(raw_data, dict):
+        return raw_data
+
+    first_page_jobs = raw_data.get("standardRecommendedJobs")
+    paging = raw_data.get("searchParamsForPaging")
+    post_data = api_response.get("_request_post_data")
+    if not isinstance(first_page_jobs, list) or not isinstance(paging, dict) or not post_data:
+        return raw_data
+
+    try:
+        request_body = json.loads(post_data)
+    except json.JSONDecodeError:
+        return raw_data
+
+    total = raw_data.get("total")
+    merged = deepcopy(raw_data)
+    merged_jobs = list(first_page_jobs)
+
+    headers = {
+        "User-Agent": UA,
+        "Content-Type": "application/json",
+        "Origin": "https://lensa.com",
+        "Referer": page_url,
+    }
+
+    next_search_params = paging
+    pages_fetched = 1
+
+    with httpx.Client(headers=headers, timeout=30, follow_redirects=True) as client:
+        while pages_fetched < max_pages:
+            request_json = deepcopy(request_body)
+            request_json["searchParams"] = deepcopy(next_search_params)
+            response = client.post(api_response["url"], json=request_json)
+            response.raise_for_status()
+            page_data = response.json()
+            page_jobs = page_data.get("standardRecommendedJobs", [])
+            if not isinstance(page_jobs, list) or not page_jobs:
+                break
+            merged_jobs.extend(page_jobs)
+            merged["searchParamsForPaging"] = page_data.get("searchParamsForPaging", next_search_params)
+            if isinstance(page_data.get("total"), int):
+                total = page_data["total"]
+                merged["total"] = total
+            next_search_params = merged.get("searchParamsForPaging", next_search_params)
+            pages_fetched += 1
+            if total and len(merged_jobs) >= total:
+                break
+
+    merged["standardRecommendedJobs"] = merged_jobs
+    return merged
 
 
 # -- Judge: filter API responses ---------------------------------------------
@@ -753,6 +937,11 @@ def execute_api_response(intel: dict, plan: dict) -> list[dict]:
     for resp in intel["api_responses"]:
         if url_pattern in resp.get("url", ""):
             target_data = resp.get("_raw_data")
+            if "lensa.com/jlp/api/more-jobs" in resp.get("url", ""):
+                try:
+                    target_data = _paginate_lensa_more_jobs_response(resp, intel.get("url", "https://lensa.com/"))
+                except Exception as e:
+                    log.warning("Lensa pagination failed: %s -- using first page only", e)
             break
 
     if not target_data:
@@ -847,7 +1036,7 @@ def execute_css_selectors(intel: dict) -> tuple[dict, list[dict]]:
 
 # -- Main per-site extraction ------------------------------------------------
 
-def _run_one_site(name: str, url: str) -> dict:
+def _run_one_site(name: str, url: str, query: str | None = None) -> dict:
     """Run full smart extraction pipeline on one site URL."""
     log.info("=" * 60)
     log.info("%s: %s", name, url)
@@ -855,7 +1044,11 @@ def _run_one_site(name: str, url: str) -> dict:
     # Step 1: Collect intelligence
     log.info("[1] Collecting page intelligence...")
     t0 = time.time()
-    intel = collect_page_intelligence(url)
+    try:
+        intel = collect_page_intelligence(url)
+    except Exception as e:
+        log.error("INTEL_ERROR: %s", e)
+        return _site_error_result(name, "INTEL_ERROR", e)
     collect_time = time.time() - t0
     log.info("Done in %.1fs | JSON-LD: %d | API: %d | testids: %d | cards: %d",
              collect_time, len(intel["json_ld"]), len(intel["api_responses"]),
@@ -869,10 +1062,13 @@ def _run_one_site(name: str, url: str) -> dict:
     _is_captcha = any(s in full_html.lower() for s in _captcha_signals) if full_html else False
     if len(cleaned_check) < 5000 and full_html and not _is_captcha:
         log.info("Cleaned HTML only %s chars -- retrying headful...", f"{len(cleaned_check):,}")
-        intel = collect_page_intelligence(url, headless=False)
-        collect_time = time.time() - t0
-        log.info("Headful done in %.1fs | JSON-LD: %d | API: %d",
-                 collect_time, len(intel["json_ld"]), len(intel["api_responses"]))
+        try:
+            intel = collect_page_intelligence(url, headless=False)
+            collect_time = time.time() - t0
+            log.info("Headful done in %.1fs | JSON-LD: %d | API: %d",
+                     collect_time, len(intel["json_ld"]), len(intel["api_responses"]))
+        except Exception as e:
+            log.warning("Headful retry failed: %s -- using original headless capture", e)
     elif _is_captcha:
         log.warning("CAPTCHA/rate-limit detected -- skipping headful retry")
 
@@ -924,6 +1120,12 @@ def _run_one_site(name: str, url: str) -> dict:
     except Exception as e:
         log.error("EXECUTION_ERROR: %s", e)
         return {"name": name, "status": "EXEC_ERROR", "error": str(e), "plan": plan}
+
+    if name == "Lensa":
+        original_count = len(jobs)
+        jobs = _filter_lensa_jobs(jobs, query)
+        if len(jobs) != original_count:
+            log.info("Filtered %d Lensa jobs by relevance/salary/remote rules", original_count - len(jobs))
 
     # Step 4: Report
     titles = sum(1 for j in jobs if j.get("title"))
@@ -1047,12 +1249,16 @@ def _run_all(
         # Parallel mode
         with ThreadPoolExecutor(max_workers=min(workers, len(targets))) as pool:
             future_to_target = {
-                pool.submit(_run_one_site, target["name"], target["url"]): target
+                pool.submit(_run_one_site, target["name"], target["url"], target.get("query")): target
                 for target in targets
             }
             for future in as_completed(future_to_target):
                 target = future_to_target[future]
-                r = future.result()
+                try:
+                    r = future.result()
+                except Exception as e:
+                    log.error("%s failed: %s", target["name"], e)
+                    r = _site_error_result(target["name"], "SITE_ERROR", e)
                 results.append(r)
                 _process_result(r, target)
     else:
@@ -1063,7 +1269,11 @@ def _run_all(
                 label = f"{target['name']} [{target['query']}]"
             log.info("[%d/%d] %s", i + 1, len(targets), label)
 
-            r = _run_one_site(target["name"], target["url"])
+            try:
+                r = _run_one_site(target["name"], target["url"], target.get("query"))
+            except Exception as e:
+                log.error("%s failed: %s", target["name"], e)
+                r = _site_error_result(target["name"], "SITE_ERROR", e)
             results.append(r)
             _process_result(r, target)
 
