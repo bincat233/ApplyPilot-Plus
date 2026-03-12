@@ -94,3 +94,16 @@ def test_apply_reset_in_progress_cli(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "Reset 2 in-progress job(s)." in result.output
+
+
+def test_apply_kill_chrome_cli(monkeypatch) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(cli, "_bootstrap", lambda: None)
+    monkeypatch.setattr("applypilot.apply.chrome.kill_all_chrome", lambda: calls.append("killed"))
+
+    result = runner.invoke(cli.app, ["apply", "--kill-chrome"])
+
+    assert result.exit_code == 0
+    assert calls == ["killed"]
+    assert "Killed tracked Chrome worker process(es)." in result.output

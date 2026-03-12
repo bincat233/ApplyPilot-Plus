@@ -296,6 +296,7 @@ def apply(
     reset_failed: bool = typer.Option(False, "--reset-failed", help="Reset all failed jobs for retry."),
     remove_expired: bool = typer.Option(False, "--remove-expired", help="Remove expired jobs from the database."),
     reset_in_progress: bool = typer.Option(False, "--reset-in-progress", help="Clear stale in-progress apply locks."),
+    kill_chrome: bool = typer.Option(False, "--kill-chrome", help="Kill tracked Chrome worker processes."),
 ) -> None:
     """Launch auto-apply to submit job applications."""
     _bootstrap()
@@ -333,6 +334,13 @@ def apply(
         from applypilot.apply.launcher import reset_in_progress as do_reset_in_progress
         count = do_reset_in_progress()
         console.print(f"[green]Reset {count} in-progress job(s).[/green]")
+        return
+
+    if kill_chrome:
+        from applypilot.apply.chrome import kill_all_chrome
+
+        kill_all_chrome()
+        console.print("[green]Killed tracked Chrome worker process(es).[/green]")
         return
 
     # --- Full apply mode ---
