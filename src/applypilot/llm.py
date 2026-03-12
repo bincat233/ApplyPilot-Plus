@@ -9,8 +9,10 @@ Auto-detects provider from environment:
 LLM_MODEL env var overrides the model name for any provider.
 """
 
+import atexit
 import logging
 import os
+import threading
 import time
 
 import httpx
@@ -285,13 +287,17 @@ class _GeminiCompatForbidden(Exception):
 # ---------------------------------------------------------------------------
 
 _instance: LLMClient | None = None
+_lock = threading.Lock()
 
 
 def get_client() -> LLMClient:
     """Return (or create) the module-level LLMClient singleton."""
     global _instance
     if _instance is None:
-        base_url, model, api_key = _detect_provider()
-        log.info("LLM provider: %s  model: %s", base_url, model)
-        _instance = LLMClient(base_url, model, api_key)
+        with _lock:
+            if _instance is None:
+                base_url, model, api_key = _detect_provider()
+                log.info("LLM provider: %s  model: %s", base_url, model)
+                _instance = LLMClient(base_url, model, api_key)
+                atexit.register(_instance.close)
     return _instance
