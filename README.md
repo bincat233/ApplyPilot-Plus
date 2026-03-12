@@ -75,7 +75,7 @@ Runs stages 1-5: discovers jobs, scores them, tailors your resume, generates cov
 
 | Stage | What Happens |
 |-------|-------------|
-| **1. Discover** | Scrapes 5 job boards (Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs) + 48 Workday employer portals + 129 Greenhouse ATS employers + 30 direct career sites |
+| **1. Discover** | Scrapes 5 job boards (Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs) + 48 Workday employer portals + 129 Greenhouse ATS employers + 31 direct career sites, including Lensa |
 | **2. Enrich** | Fetches full job descriptions via JSON-LD, CSS selectors, or AI-powered extraction |
 | **3. Score** | AI rates every job 1-10 based on your resume and preferences. Only high-fit jobs proceed |
 | **4. Tailor** | AI rewrites your resume per job: reorganizes, emphasizes relevant experience, adds keywords. Never fabricates |
@@ -94,7 +94,7 @@ Each stage is independent. Run them all or pick what you need.
 | AI scoring | 1-10 fit score per job | Basic filtering | Your gut feeling |
 | Resume tailoring | Per-job AI rewrite | Template-based | Hours per application |
 | Auto-apply | Full form navigation + submission | LinkedIn Easy Apply only | Click, type, repeat |
-| Supported sites | Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs, 129 Greenhouse employers, 46 Workday portals, 28 direct sites | LinkedIn | Whatever you open |
+| Supported sites | Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs, 129 Greenhouse employers, 48 Workday portals, 31 direct sites including Lensa | LinkedIn | Whatever you open |
 | License | AGPL-3.0 | MIT | N/A |
 
 ---
@@ -136,7 +136,7 @@ API keys and runtime config: `GEMINI_API_KEY`, `LLM_MODEL`, `CAPSOLVER_API_KEY` 
 
 ### Package configs (shipped with ApplyPilot-Plus)
 - `config/employers.yaml` - Workday employer registry (48 preconfigured)
-- `config/sites.yaml` - Direct career sites (30+), blocked sites, base URLs, manual ATS domains
+- `config/sites.yaml` - Direct career sites (31+), blocked sites, base URLs, manual ATS domains
 - `config/searches.example.yaml` - Example search configuration
 
 ---
@@ -144,7 +144,7 @@ API keys and runtime config: `GEMINI_API_KEY`, `LLM_MODEL`, `CAPSOLVER_API_KEY` 
 ## How Stages Work
 
 ### Discover
-Queries Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs via JobSpy. Fetches from 129 Greenhouse ATS employers. Scrapes 48 Workday employer portals (configurable in `employers.yaml`). Hits 30 direct career sites with custom extractors. Deduplicates by URL.
+Queries Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs via JobSpy. Fetches from 129 Greenhouse ATS employers. Scrapes 48 Workday employer portals (configurable in `employers.yaml`). Hits 31 direct career sites with custom extractors, including Lensa with pagination-aware extraction and extra relevance filtering. Deduplicates by URL.
 
 For targeted debugging or source-specific refreshes, you can limit discovery to selected `sites.yaml` entries:
 
