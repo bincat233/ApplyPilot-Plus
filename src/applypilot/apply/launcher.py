@@ -100,76 +100,86 @@ def acquire_job(target_url: str | None = None, min_score: int = 7,
         Job dict or None if the queue is empty.
     """
     conn = get_connection()
-    try:
-        conn.execute("BEGIN IMMEDIATE")
+    for attempt in range(3):
+        try:
+            conn.execute("BEGIN IMMEDIATE")
 
-        if target_url:
-            like = f"%{target_url.split('?')[0].rstrip('/')}%"
-            row = conn.execute("""
-                SELECT url, title, site, application_url, tailored_resume_path,
-                       fit_score, location, full_description, cover_letter_path
-                FROM jobs
-                WHERE (url = ? OR application_url = ? OR application_url LIKE ? OR url LIKE ?)
-                  AND tailored_resume_path IS NOT NULL
-                  AND apply_status != 'in_progress'
-                LIMIT 1
-            """, (target_url, target_url, like, like)).fetchone()
-        else:
-            blocked_sites, blocked_patterns = _load_blocked()
-            # Build parameterized filters to avoid SQL injection
-            params: list = [min_score]
-            site_clause = ""
-            if blocked_sites:
-                placeholders = ",".join("?" * len(blocked_sites))
-                site_clause = f"AND site NOT IN ({placeholders})"
-                params.extend(blocked_sites)
-            url_clauses = ""
-            if blocked_patterns:
-                url_clauses = " ".join(f"AND url NOT LIKE ?" for _ in blocked_patterns)
-                params.extend(blocked_patterns)
-            row = conn.execute(f"""
-                SELECT url, title, site, application_url, tailored_resume_path,
-                       fit_score, location, full_description, cover_letter_path
-                FROM jobs
-                WHERE tailored_resume_path IS NOT NULL
-                  AND (apply_status IS NULL OR apply_status = 'failed')
-                  AND (apply_attempts IS NULL OR apply_attempts < ?)
-                  AND fit_score >= ?
-                  {site_clause}
-                  {url_clauses}
-                ORDER BY fit_score DESC, url
-                LIMIT 1
-            """, [config.DEFAULTS["max_apply_attempts"]] + params).fetchone()
+            if target_url:
+                like = f"%{target_url.split('?')[0].rstrip('/')}%"
+                row = conn.execute("""
+                    SELECT url, title, site, application_url, tailored_resume_path,
+                           fit_score, location, full_description, cover_letter_path
+                    FROM jobs
+                    WHERE (url = ? OR application_url = ? OR application_url LIKE ? OR url LIKE ?)
+                      AND tailored_resume_path IS NOT NULL
+                      AND apply_status != 'in_progress'
+                    LIMIT 1
+                """, (target_url, target_url, like, like)).fetchone()
+            else:
+                blocked_sites, blocked_patterns = _load_blocked()
+                # Build parameterized filters to avoid SQL injection
+                params: list = [min_score]
+                site_clause = ""
+                if blocked_sites:
+                    placeholders = ",".join("?" * len(blocked_sites))
+                    site_clause = f"AND site NOT IN ({placeholders})"
+                    params.extend(blocked_sites)
+                url_clauses = ""
+                if blocked_patterns:
+                    url_clauses = " ".join(f"AND url NOT LIKE ?" for _ in blocked_patterns)
+                    params.extend(blocked_patterns)
+                row = conn.execute(f"""
+                    SELECT url, title, site, application_url, tailored_resume_path,
+                           fit_score, location, full_description, cover_letter_path
+                    FROM jobs
+                    WHERE tailored_resume_path IS NOT NULL
+                      AND (apply_status IS NULL OR apply_status = 'failed')
+                      AND (apply_attempts IS NULL OR apply_attempts < ?)
+                      AND fit_score >= ?
+                      {site_clause}
+                      {url_clauses}
+                    ORDER BY fit_score DESC, url
+                    LIMIT 1
+                """, [config.DEFAULTS["max_apply_attempts"]] + params).fetchone()
 
-        if not row:
-            conn.rollback()
-            return None
+            if not row:
+                conn.rollback()
+                return None
 
-        # Skip manual ATS sites (unsolvable CAPTCHAs)
-        from applypilot.config import is_manual_ats
-        apply_url = row["application_url"] or row["url"]
-        if is_manual_ats(apply_url):
-            conn.execute(
-                "UPDATE jobs SET apply_status = 'manual', apply_error = 'manual ATS' WHERE url = ?",
-                (row["url"],),
-            )
+            # Skip manual ATS sites (unsolvable CAPTCHAs)
+            from applypilot.config import is_manual_ats
+            apply_url = row["application_url"] or row["url"]
+            if is_manual_ats(apply_url):
+                conn.execute(
+                    "UPDATE jobs SET apply_status = 'manual', apply_error = 'manual ATS' WHERE url = ?",
+                    (row["url"],),
+                )
+                conn.commit()
+                logger.info("Skipping manual ATS: %s", row["url"][:80])
+                return None
+
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute("""
+                UPDATE jobs SET apply_status = 'in_progress',
+                               agent_id = ?,
+                               last_attempted_at = ?
+                WHERE url = ?
+            """, (f"worker-{worker_id}", now, row["url"]))
             conn.commit()
-            logger.info("Skipping manual ATS: %s", row["url"][:80])
-            return None
 
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute("""
-            UPDATE jobs SET apply_status = 'in_progress',
-                           agent_id = ?,
-                           last_attempted_at = ?
-            WHERE url = ?
-        """, (f"worker-{worker_id}", now, row["url"]))
-        conn.commit()
+            return dict(row)
+        except sqlite3.OperationalError as e:
+            conn.rollback()
+            if "locked" in str(e).lower() and attempt < 2:
+                logger.warning("DB locked in acquire_job, retrying...")
+                time.sleep(2)
+                continue
+            raise
+        except Exception:
+            conn.rollback()
+            raise
 
-        return dict(row)
-    except Exception:
-        conn.rollback()
-        raise
+    return None
 
 
 def mark_result(url: str, status: str, error: str | None = None,
@@ -186,13 +196,20 @@ def mark_result(url: str, status: str, error: str | None = None,
             WHERE url = ?
         """, (now, duration_ms, task_id, url))
     else:
-        attempts = 99 if permanent else "COALESCE(apply_attempts, 0) + 1"
-        conn.execute(f"""
-            UPDATE jobs SET apply_status = ?, apply_error = ?,
-                           apply_attempts = {attempts}, agent_id = NULL,
-                           apply_duration_ms = ?, apply_task_id = ?
-            WHERE url = ?
-        """, (status, error or "unknown", duration_ms, task_id, url))
+        if permanent:
+            conn.execute("""
+                UPDATE jobs SET apply_status = ?, apply_error = ?,
+                               apply_attempts = 99, agent_id = NULL,
+                               apply_duration_ms = ?, apply_task_id = ?
+                WHERE url = ?
+            """, (status, error or "unknown", duration_ms, task_id, url))
+        else:
+            conn.execute("""
+                UPDATE jobs SET apply_status = ?, apply_error = ?,
+                               apply_attempts = COALESCE(apply_attempts, 0) + 1, agent_id = NULL,
+                               apply_duration_ms = ?, apply_task_id = ?
+                WHERE url = ?
+            """, (status, error or "unknown", duration_ms, task_id, url))
     conn.commit()
 
 
