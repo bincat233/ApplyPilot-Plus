@@ -82,6 +82,7 @@ def generate_dashboard(output_path: str | None = None) -> str:
         FROM jobs
         WHERE fit_score >= 5
         ORDER BY fit_score DESC, site, title
+        LIMIT 500
     """).fetchall()
 
     # Successfully submitted applications
@@ -108,7 +109,7 @@ def generate_dashboard(output_path: str | None = None) -> str:
     failed_count = len(failed_jobs)
 
     # Color map per site
-    colors = {
+    known_colors = {
         "RemoteOK": "#10b981", "WelcomeToTheJungle": "#f59e0b",
         "Job Bank Canada": "#3b82f6", "CareerJet Canada": "#8b5cf6",
         "Hacker News Jobs": "#ff6600", "BuiltIn Remote": "#ec4899",
@@ -116,6 +117,15 @@ def generate_dashboard(output_path: str | None = None) -> str:
         "indeed": "#2164f3", "linkedin": "#0a66c2",
         "Dice": "#eb1c26", "Glassdoor": "#0caa41",
     }
+
+    def _site_color(site: str) -> str:
+        if site in known_colors:
+            return known_colors[site]
+        hue = hash(site) % 360
+        return f"hsl({hue}, 60%, 45%)"
+
+    colors = {site: _site_color(site) for site in set((j["site"] or "") for j in jobs)}
+    colors.update(known_colors)
 
     # Score distribution bar chart
     score_bars = ""
@@ -247,7 +257,7 @@ def generate_dashboard(output_path: str | None = None) -> str:
             try:
                 from datetime import datetime as _dt
                 failed_dt = _dt.fromisoformat(j["last_attempted_at"].replace("Z", "+00:00"))
-                failed_date_str = failed_dt.strftime("%b %-d, %Y")
+                failed_date_str = failed_dt.strftime("%b %d, %Y")
             except (ValueError, AttributeError):
                 failed_date_str = j["last_attempted_at"][:10]
             short_reason = (
@@ -263,7 +273,7 @@ def generate_dashboard(output_path: str | None = None) -> str:
             card_extra_class = "  job-card--failed"
 
         job_sections += f"""
-        <div class="job-card{card_extra_class}" data-score="{score}" data-site="{escape(j['site'] or '')}" data-location="{location.lower()}"{applied_attr}>
+        <div class="job-card{card_extra_class}" data-score="{score}" data-site="{escape(j['site'] or '')}" data-location="{escape(location.lower())}"{applied_attr}>
           {applied_banner}{failed_banner}
           <div class="card-header">
             <span class="score-pill" style="background:{'#10b981' if score >= 7 else '#f59e0b'}">{score}</span>
