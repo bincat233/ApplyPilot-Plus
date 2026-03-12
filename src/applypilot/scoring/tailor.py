@@ -378,6 +378,7 @@ def tailor_resume(
     report: dict = {
         "attempts": 0, "validator": None, "judge": None,
         "status": "pending", "validation_mode": validation_mode,
+        "parsed_data": None,
     }
     avoid_notes: list[str] = []
     tailored = ""
@@ -404,6 +405,7 @@ def tailor_resume(
         # Parse JSON from response
         try:
             data = extract_json(raw)
+            report["parsed_data"] = data
         except ValueError as exc:
             log.warning("Attempt %d JSON parse failed (%s). Raw response (first 500 chars):\n%s",
                         attempt + 1, exc, raw[:1000])
