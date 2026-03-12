@@ -155,11 +155,11 @@ def _run_discover(workers: int = 1, site_filter: list[str] | None = None) -> dic
     return stats
 
 
-def _run_enrich(workers: int = 1) -> dict:
+def _run_enrich(workers: int = 1, headless: bool = True) -> dict:
     """Stage: Detail enrichment — scrape full descriptions and apply URLs."""
     try:
         from applypilot.enrichment.detail import run_enrichment
-        run_enrichment(workers=workers)
+        run_enrichment(workers=workers, headless=headless)
         return {"status": "ok"}
     except Exception as e:
         log.error("Enrichment failed: %s", e)
@@ -318,6 +318,7 @@ def _run_stage_streaming(
     min_score: int = 7,
     workers: int = 1,
     validation_mode: str = "normal",
+    headless: bool = True,
     site_filter: list[str] | None = None,
 ) -> None:
     """Run a single stage in streaming mode: loop until upstream done + no work.
@@ -335,6 +336,8 @@ def _run_stage_streaming(
         kwargs["workers"] = workers
     if stage == "discover":
         kwargs["site_filter"] = site_filter
+    if stage == "enrich":
+        kwargs["headless"] = headless
 
     upstream = _UPSTREAM[stage]
 
@@ -383,7 +386,8 @@ def _run_stage_streaming(
 # ---------------------------------------------------------------------------
 
 def _run_sequential(ordered: list[str], min_score: int, workers: int = 1,
-                    validation_mode: str = "normal", site_filter: list[str] | None = None) -> dict:
+                    validation_mode: str = "normal", headless: bool = True,
+                    site_filter: list[str] | None = None) -> dict:
     """Execute stages one at a time (original behavior)."""
     results: list[dict] = []
     errors: dict[str, str] = {}
@@ -408,6 +412,8 @@ def _run_sequential(ordered: list[str], min_score: int, workers: int = 1,
                 kwargs["workers"] = workers
             if name == "discover":
                 kwargs["site_filter"] = site_filter
+            if name == "enrich":
+                kwargs["headless"] = headless
             result = runner(**kwargs)
             elapsed = time.time() - t0
 
@@ -439,7 +445,8 @@ def _run_sequential(ordered: list[str], min_score: int, workers: int = 1,
 
 
 def _run_streaming(ordered: list[str], min_score: int, workers: int = 1,
-                   validation_mode: str = "normal", site_filter: list[str] | None = None) -> dict:
+                   validation_mode: str = "normal", headless: bool = True,
+                   site_filter: list[str] | None = None) -> dict:
     """Execute stages concurrently with DB as conveyor belt."""
     tracker = _StageTracker()
     stop_event = threading.Event()
@@ -461,7 +468,7 @@ def _run_streaming(ordered: list[str], min_score: int, workers: int = 1,
         start_times[name] = time.time()
         t = threading.Thread(
             target=_run_stage_streaming,
-            args=(name, tracker, stop_event, min_score, workers, validation_mode, site_filter),
+            args=(name, tracker, stop_event, min_score, workers, validation_mode, headless, site_filter),
             name=f"stage-{name}",
             daemon=True,
         )
@@ -508,6 +515,7 @@ def run_pipeline(
     dry_run: bool = False,
     stream: bool = False,
     workers: int = 1,
+    headless: bool = True,
     site_filter: list[str] | None = None,
     validation_mode: str = "normal",
 ) -> dict:
@@ -542,6 +550,7 @@ def run_pipeline(
     ))
     console.print(f"  Min score:  {min_score}")
     console.print(f"  Workers:    {workers}")
+    console.print(f"  Headless:   {headless}")
     if site_filter:
         console.print(f"  Site filter:{' ' if len('Site filter:') < 11 else ''}{', '.join(site_filter)}")
     console.print(f"  Validation: {validation_mode}")
@@ -562,10 +571,12 @@ def run_pipeline(
     # Execute
     if stream:
         result = _run_streaming(ordered, min_score, workers=workers,
+                                headless=headless,
                                 validation_mode=validation_mode,
                                 site_filter=site_filter)
     else:
         result = _run_sequential(ordered, min_score, workers=workers,
+                                 headless=headless,
                                  validation_mode=validation_mode,
                                  site_filter=site_filter)
 

@@ -87,6 +87,7 @@ def run(
     workers: int = typer.Option(1, "--workers", "-w", help="Parallel threads for discovery/enrichment stages."),
     stream: bool = typer.Option(False, "--stream", help="Run stages concurrently (streaming mode)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview stages without executing."),
+    show_browser: bool = typer.Option(False, "--show-browser", help="Show browser window during enrichment."),
     site_filter: Optional[list[str]] = typer.Option(
         None,
         "--site-filter",
@@ -140,6 +141,7 @@ def run(
         dry_run=dry_run,
         stream=stream,
         workers=workers,
+        headless=not show_browser,
         site_filter=site_filter,
         validation_mode=validation,
     )

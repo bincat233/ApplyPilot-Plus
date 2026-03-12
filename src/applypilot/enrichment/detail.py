@@ -612,6 +612,7 @@ def scrape_site_batch(
     jobs: list[tuple],
     delay: float = 2.0,
     max_jobs: int | None = None,
+    headless: bool = True,
 ) -> dict:
     """Process all jobs for one site using shared browser context.
 
@@ -633,7 +634,7 @@ def scrape_site_batch(
 
     try:
         with sync_playwright() as p:
-            launch_opts: dict = {"headless": True}
+            launch_opts: dict = {"headless": headless}
             if _PROXY_CONFIG:
                 launch_opts["proxy"] = _PROXY_CONFIG["playwright"]
             browser = p.chromium.launch(**launch_opts)
@@ -693,6 +694,7 @@ def _run_detail_scraper(
     sites: list[str] | None = None,
     max_per_site: int | None = None,
     workers: int = 1,
+    headless: bool = True,
 ) -> dict:
     """Groups pending jobs by site and processes each batch.
 
@@ -745,7 +747,7 @@ def _run_detail_scraper(
             jobs = site_jobs[site]
             delay = SITE_DELAYS.get(site, 2.0)
             log.info("%s -- %d jobs (delay=%.1fs)", site, len(jobs), delay)
-            stats = scrape_site_batch(None, site, jobs, delay=delay, max_jobs=max_per_site)
+            stats = scrape_site_batch(None, site, jobs, delay=delay, max_jobs=max_per_site, headless=headless)
             log.info("%s summary: %d ok, %d partial, %d error | T1=%d T2=%d T3=%d",
                      site, stats["ok"], stats["partial"], stats["error"],
                      stats["tiers"].get(1, 0), stats["tiers"].get(2, 0), stats["tiers"].get(3, 0))
@@ -762,7 +764,7 @@ def _run_detail_scraper(
             delay = SITE_DELAYS.get(site, 2.0)
             log.info("%s -- %d jobs (delay=%.1fs)", site, len(jobs), delay)
 
-            stats = scrape_site_batch(conn, site, jobs, delay=delay, max_jobs=max_per_site)
+            stats = scrape_site_batch(conn, site, jobs, delay=delay, max_jobs=max_per_site, headless=headless)
             _merge_stats(stats)
 
             log.info("Site summary: %d ok, %d partial, %d error | T1=%d T2=%d T3=%d",
@@ -854,7 +856,7 @@ def stream_detail(
 
 # -- Public entry point ------------------------------------------------------
 
-def run_enrichment(limit: int = 100, workers: int = 1) -> dict:
+def run_enrichment(limit: int = 100, workers: int = 1, headless: bool = True) -> dict:
     """Main entry point for detail page enrichment.
 
     Fetches pending jobs from the database (those without full_description),
@@ -864,6 +866,7 @@ def run_enrichment(limit: int = 100, workers: int = 1) -> dict:
     Args:
         limit: Maximum number of jobs per site to process.
         workers: Number of parallel threads for site batch processing. Default 1 (sequential).
+        headless: Whether to run the browser headlessly during enrichment.
 
     Returns:
         Dict with stats: processed, ok, partial, error, tiers.
@@ -888,6 +891,6 @@ def run_enrichment(limit: int = 100, workers: int = 1) -> dict:
             log.info("WTTJ: %d URLs updated", updated)
 
     # Run the detail scraper
-    stats = _run_detail_scraper(conn, max_per_site=limit, workers=workers)
+    stats = _run_detail_scraper(conn, max_per_site=limit, workers=workers, headless=headless)
 
     return stats

@@ -156,6 +156,12 @@ applypilot run discover --site-filter Lensa --site-filter Dice
 ### Enrich
 Visits each job URL and extracts the full description. 3-tier cascade: JSON-LD structured data, then CSS selector patterns, then AI-powered extraction for unknown layouts.
 
+If a site reacts poorly to headless browsing, run enrichment with a visible browser:
+
+```bash
+applypilot run enrich --show-browser
+```
+
 ### Score
 AI scores every job 1-10 against your profile. 9-10 = strong match, 7-8 = good, 5-6 = moderate, 1-4 = skip. Only jobs above your threshold proceed to tailoring.
 
@@ -192,6 +198,7 @@ applypilot run --stream                 # Concurrent stages (streaming mode)
 applypilot run --min-score 8            # Override score threshold
 applypilot run --dry-run                # Preview without executing
 applypilot run discover --site-filter Lensa  # Only run smart extract for matching sites
+applypilot run enrich --show-browser    # Show browser during enrichment
 applypilot run --validation lenient     # Relax validation (recommended for Gemini free tier)
 applypilot run --validation strict      # Strictest validation (retries on any banned word)
 applypilot add-url URL                  # Add or update a job by URL
