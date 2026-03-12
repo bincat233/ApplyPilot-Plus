@@ -183,6 +183,8 @@ applypilot run enrich --reset-enrich-errors  # clear failed enrichment state
 applypilot apply --mark-applied URL    # manually mark a job as applied
 applypilot apply --mark-failed URL     # manually mark a job as failed
 applypilot apply --reset-failed        # reset all failed jobs for retry
+applypilot apply --remove-expired      # delete expired jobs from the database
+applypilot apply --reset-in-progress   # clear stuck apply locks
 applypilot apply --gen --url URL       # generate prompt file for manual debugging
 ```
 
@@ -209,6 +211,8 @@ applypilot apply --workers 3            # Parallel browser workers
 applypilot apply --dry-run              # Fill forms without submitting
 applypilot apply --continuous           # Run forever, polling for new jobs
 applypilot apply --headless             # Headless browser mode
+applypilot apply --remove-expired       # Remove expired jobs from the DB
+applypilot apply --reset-in-progress    # Clear stale in-progress locks
 applypilot apply --url URL              # Apply to a specific job
 applypilot status                       # Pipeline statistics
 applypilot dashboard                    # Open HTML results dashboard

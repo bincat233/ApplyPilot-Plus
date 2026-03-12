@@ -231,6 +231,8 @@ def apply(
     mark_failed: Optional[str] = typer.Option(None, "--mark-failed", help="Manually mark a job URL as failed (provide URL)."),
     fail_reason: Optional[str] = typer.Option(None, "--fail-reason", help="Reason for --mark-failed."),
     reset_failed: bool = typer.Option(False, "--reset-failed", help="Reset all failed jobs for retry."),
+    remove_expired: bool = typer.Option(False, "--remove-expired", help="Remove expired jobs from the database."),
+    reset_in_progress: bool = typer.Option(False, "--reset-in-progress", help="Clear stale in-progress apply locks."),
 ) -> None:
     """Launch auto-apply to submit job applications."""
     _bootstrap()
@@ -256,6 +258,18 @@ def apply(
         from applypilot.apply.launcher import reset_failed as do_reset
         count = do_reset()
         console.print(f"[green]Reset {count} failed job(s) for retry.[/green]")
+        return
+
+    if remove_expired:
+        from applypilot.apply.launcher import remove_expired as do_remove
+        count = do_remove()
+        console.print(f"[green]Removed {count} expired job(s).[/green]")
+        return
+
+    if reset_in_progress:
+        from applypilot.apply.launcher import reset_in_progress as do_reset_in_progress
+        count = do_reset_in_progress()
+        console.print(f"[green]Reset {count} in-progress job(s).[/green]")
         return
 
     # --- Full apply mode ---

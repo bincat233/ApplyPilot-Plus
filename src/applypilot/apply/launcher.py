@@ -307,6 +307,34 @@ def reset_failed() -> int:
     return cursor.rowcount
 
 
+def remove_expired() -> int:
+    """Remove expired jobs from the database."""
+    conn = get_connection()
+    cursor = conn.execute(
+        """
+        DELETE FROM jobs
+        WHERE LOWER(COALESCE(apply_status, '')) = 'expired'
+           OR LOWER(COALESCE(apply_error, '')) LIKE 'expired%'
+        """
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
+def reset_in_progress() -> int:
+    """Clear stale in-progress apply locks."""
+    conn = get_connection()
+    cursor = conn.execute(
+        """
+        UPDATE jobs
+        SET apply_status = NULL, agent_id = NULL
+        WHERE apply_status = 'in_progress'
+        """
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
 # ---------------------------------------------------------------------------
 # Per-job execution
 # ---------------------------------------------------------------------------
