@@ -203,6 +203,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, 
 
 ## Upstream Contributions Merged Here
 
+- [#28](https://github.com/Pickle-Pixel/ApplyPilot/pull/28) by OpenClaw Bot: Add `SECURITY.md`
 - [#31](https://github.com/Pickle-Pixel/ApplyPilot/pull/31) by [@vivekshekharrai-del](https://github.com/vivekshekharrai-del): Fix UnicodeEncodeError in `doctor` on Windows
 
 ---

@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please open a private security advisory on GitHub or email the maintainers directly before public disclosure.
+If you discover a security vulnerability, please open a private security advisory on GitHub or email `isxiongzj@gmail.com` before public disclosure.
 
 Please include:
 - Description of the issue
