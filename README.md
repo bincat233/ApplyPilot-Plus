@@ -205,6 +205,8 @@ applypilot apply --gen --url URL       # generate prompt file for manual debuggi
 ```
 applypilot init                         # First-time setup wizard
 applypilot doctor                       # Verify setup, diagnose missing requirements
+applypilot --log-level info --http-log-level warning  # Control app vs HTTP log verbosity
+applypilot --log-file ~/.applypilot/run.log status    # Mirror logs to a file explicitly
 applypilot run [stages...]              # Run pipeline stages (or 'all')
 applypilot run --workers 4              # Parallel discovery/enrichment
 applypilot run --stream                 # Concurrent stages (streaming mode)

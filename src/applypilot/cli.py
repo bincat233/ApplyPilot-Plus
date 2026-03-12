@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -13,34 +14,43 @@ from rich.table import Table
 from applypilot import __version__
 
 
-def _configure_logging() -> None:
+def _parse_log_level(value: str) -> int:
+    level = getattr(logging, value.upper(), None)
+    if not isinstance(level, int):
+        raise typer.BadParameter("Choose one of: debug, info, warning, error, critical.")
+    return level
+
+
+def _configure_logging(
+    level: str = "INFO",
+    http_level: str = "WARNING",
+    log_file: Path | None = None,
+) -> None:
     """Set consistent logging output for CLI runs."""
+    root_level = _parse_log_level(level)
+    noisy_level = _parse_log_level(http_level)
     logging.basicConfig(
-        level=logging.INFO,
+        level=root_level,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%H:%M:%S",
+        force=True,
     )
 
-    # Keep LiteLLM internals quiet by default; warnings/errors still surface.
-    for name in ("LiteLLM", "litellm"):
+    if log_file is not None:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(root_level)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S")
+        )
+        logging.getLogger().addHandler(file_handler)
+
+    # Keep SDK/network internals quiet by default; make them opt-in via
+    # --http-log-level debug/info when needed.
+    for name in ("LiteLLM", "litellm", "httpx", "httpcore", "openai"):
         noisy = logging.getLogger(name)
-        noisy.handlers.clear()
-        noisy.setLevel(logging.WARNING)
+        noisy.setLevel(noisy_level)
         noisy.propagate = True
-
-    # Route verbose tailor/cover loggers to a file instead of the terminal.
-    # Per-attempt warnings and validation details are useful for debugging
-    # but too noisy for normal CLI output.
-    from applypilot.config import LOG_DIR
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    _file_fmt = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S")
-    for logger_name in ("applypilot.scoring.tailor", "applypilot.scoring.cover_letter"):
-        file_log = logging.getLogger(logger_name)
-        file_log.propagate = False  # suppress terminal output
-        fh = logging.FileHandler(LOG_DIR / f"{logger_name.split('.')[-1]}.log", encoding="utf-8")
-        fh.setFormatter(_file_fmt)
-        file_log.addHandler(fh)
-
 
 _configure_logging()
 
@@ -124,8 +134,24 @@ def main(
         callback=_version_callback,
         is_eager=True,
     ),
+    log_level: str = typer.Option(
+        "info",
+        "--log-level",
+        help="Application log level: debug, info, warning, error, critical.",
+    ),
+    http_log_level: str = typer.Option(
+        "warning",
+        "--http-log-level",
+        help="HTTP/SDK log level: debug, info, warning, error, critical.",
+    ),
+    log_file: Optional[Path] = typer.Option(
+        None,
+        "--log-file",
+        help="Optional file to mirror logs to.",
+    ),
 ) -> None:
     """ApplyPilot — AI-powered end-to-end job application pipeline."""
+    _configure_logging(level=log_level, http_level=http_log_level, log_file=log_file)
 
 
 @app.command()
