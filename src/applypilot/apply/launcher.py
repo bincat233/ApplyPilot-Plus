@@ -25,7 +25,7 @@ from rich.live import Live
 
 from applypilot import config
 from applypilot.database import get_connection
-from applypilot.apply import chrome, dashboard, prompt as prompt_mod
+from applypilot.apply import prompt as prompt_mod
 from applypilot.apply.chrome import (
     launch_chrome, cleanup_worker, kill_all_chrome,
     reset_worker_dir, cleanup_on_exit, _kill_process_tree,
