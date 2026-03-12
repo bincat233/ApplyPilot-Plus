@@ -23,6 +23,16 @@ def test_configure_logging_treats_http_as_debug_noise() -> None:
     assert logging.getLogger("httpx").level == logging.INFO
 
 
+def test_configure_logging_clears_litellm_handlers() -> None:
+    logger = logging.getLogger("LiteLLM")
+    logger.handlers[:] = [logging.StreamHandler()]
+
+    cli._configure_logging(level="debug")
+
+    assert logger.handlers == []
+    assert logger.propagate is True
+
+
 def test_root_help_includes_logging_options() -> None:
     result = runner.invoke(cli.app, ["--help"])
 

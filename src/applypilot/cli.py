@@ -46,8 +46,17 @@ def _configure_logging(
 
     # Keep SDK/network internals quiet by default. When the user opts into
     # debug logging, expose HTTP/SDK request details too.
-    for name in ("LiteLLM", "litellm", "httpx", "httpcore", "openai"):
+    for name in (
+        "LiteLLM",
+        "LiteLLM Router",
+        "LiteLLM Proxy",
+        "litellm",
+        "httpx",
+        "httpcore",
+        "openai",
+    ):
         noisy = logging.getLogger(name)
+        noisy.handlers.clear()
         noisy.setLevel(noisy_level)
         noisy.propagate = True
 
