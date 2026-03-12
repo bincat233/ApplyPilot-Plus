@@ -203,6 +203,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, 
 
 ## Upstream Contributions Merged Here
 
+- [#25](https://github.com/Pickle-Pixel/ApplyPilot/pull/25) by [@rothnic](https://github.com/rothnic): Add Greenhouse ATS discovery, employer registry, and Greenhouse CLI tools
 - [#8](https://github.com/Pickle-Pixel/ApplyPilot/pull/8) by [@cbrooker](https://github.com/cbrooker): Add applied and failed indicators to HTML dashboard job cards, plus one-click auto-apply command copy
 - [#7](https://github.com/Pickle-Pixel/ApplyPilot/pull/7) by [@cbrooker](https://github.com/cbrooker): Add submitted and failed application tables to the HTML dashboard
 - [#28](https://github.com/Pickle-Pixel/ApplyPilot/pull/28) by OpenClaw Bot: Add `SECURITY.md`
