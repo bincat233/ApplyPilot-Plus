@@ -1,15 +1,17 @@
 <!-- logo here -->
 
-> **⚠️ ApplyPilot** is the original open-source project, created by [Pickle-Pixel](https://github.com/Pickle-Pixel) and first published on GitHub on **February 17, 2026**. We are **not affiliated** with applypilot.app, useapplypilot.com, or any other product using the "ApplyPilot" name. These sites are **not associated with this project** and may misrepresent what they offer. If you're looking for the autonomous, open-source job application agent — you're in the right place.
+> **ApplyPilot-Plus** is an actively maintained fork of the original open-source project [ApplyPilot](https://github.com/Pickle-Pixel/ApplyPilot), created by [Pickle-Pixel](https://github.com/Pickle-Pixel) and first published on GitHub on **February 17, 2026**. This fork exists to merge useful pending changes, review community contributions, and keep the project moving.
+>
+> We are **not affiliated** with applypilot.app, useapplypilot.com, or any other product using the "ApplyPilot" name. These sites are **not associated** with this repository and may misrepresent what they offer.
 
-# ApplyPilot
+# ApplyPilot-Plus
 
 **Applied to 1,000 jobs in 2 days. Fully autonomous. Open source.**
 
 [![PyPI version](https://img.shields.io/pypi/v/applypilot?color=blue)](https://pypi.org/project/applypilot/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/Pickle-Pixel/ApplyPilot?style=social)](https://github.com/Pickle-Pixel/ApplyPilot)
+[![GitHub stars](https://img.shields.io/github/stars/bincat233/ApplyPilot-Plus?style=social)](https://github.com/bincat233/ApplyPilot-Plus)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/S6S01UL5IO)
 
 
@@ -20,9 +22,22 @@ https://github.com/user-attachments/assets/7ee3417f-43d4-4245-9952-35df1e77f2df
 
 ---
 
+## Why This Fork Exists
+
+ApplyPilot-Plus exists to keep the project useful and moving:
+
+- Fix bugs and maintain compatibility as the ecosystem changes
+- Review and merge community pull requests
+- Proactively bring in valuable upstream or community PRs that remain pending
+- Maintain a practical, contributor-friendly fork for people who want to keep building on ApplyPilot
+
+This repository aims to stay respectful to the original project while providing a place where useful improvements can actually land.
+
+---
+
 ## What It Does
 
-ApplyPilot is a 6-stage autonomous job application pipeline. It discovers jobs across 5+ boards, scores them against your resume with AI, tailors your resume per job, writes cover letters, and **submits applications for you**. It navigates forms, uploads documents, answers screening questions, all hands-free.
+ApplyPilot-Plus is a 6-stage autonomous job application pipeline. It discovers jobs across 5+ boards, scores them against your resume with AI, tailors your resume per job, writes cover letters, and **submits applications for you**. It navigates forms, uploads documents, answers screening questions, all hands-free.
 
 Three commands. That's it.
 
@@ -47,7 +62,7 @@ applypilot apply --dry-run  # fill forms without submitting
 ### Full Pipeline (recommended)
 **Requires:** Python 3.11+, Node.js (for npx), Gemini API key (free), Claude Code CLI, Chrome
 
-Runs all 6 stages, from job discovery to autonomous application submission. This is the full power of ApplyPilot.
+Runs all 6 stages, from job discovery to autonomous application submission. This is the full power of ApplyPilot-Plus.
 
 ### Discovery + Tailoring Only
 **Requires:** Python 3.11+, Gemini API key (free)
@@ -73,7 +88,7 @@ Each stage is independent. Run them all or pick what you need.
 
 ## ApplyPilot vs The Alternatives
 
-| Feature | ApplyPilot | AIHawk | Manual |
+| Feature | ApplyPilot-Plus | AIHawk | Manual |
 |---------|-----------|--------|--------|
 | Job discovery | 5 boards + Workday + direct sites | LinkedIn only | One board at a time |
 | AI scoring | 1-10 fit score per job | Basic filtering | Your gut feeling |
@@ -119,7 +134,7 @@ Job search queries, target titles, locations, boards. Run multiple searches with
 ### `.env`
 API keys and runtime config: `GEMINI_API_KEY`, `LLM_MODEL`, `CAPSOLVER_API_KEY` (optional).
 
-### Package configs (shipped with ApplyPilot)
+### Package configs (shipped with ApplyPilot-Plus)
 - `config/employers.yaml` - Workday employer registry (48 preconfigured)
 - `config/sites.yaml` - Direct career sites (30+), blocked sites, base URLs, manual ATS domains
 - `config/searches.example.yaml` - Example search configuration
@@ -190,6 +205,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, 
 
 ## License
 
-ApplyPilot is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+ApplyPilot-Plus is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 
 You are free to use, modify, and distribute this software. If you deploy a modified version as a service, you must release your source code under the same license.
