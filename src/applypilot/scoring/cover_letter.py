@@ -6,6 +6,7 @@ profile at runtime. No hardcoded personal information.
 """
 
 import logging
+import json
 import re
 import time
 from datetime import datetime, timezone
@@ -24,6 +25,22 @@ from applypilot.scoring.validator import (
 log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 5  # max cross-run retries before giving up
+
+
+def _load_tailored_resume_text(job: dict, profile: dict, fallback_resume: str) -> str:
+    """Load tailored resume text from JSON when available, else fall back safely."""
+    json_path = job.get("tailored_resume_json_path")
+    if json_path and Path(json_path).exists():
+        from applypilot.scoring.tailor import assemble_resume_text
+
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+        return assemble_resume_text(data, profile)
+
+    tailored_path = job.get("tailored_resume_path")
+    if tailored_path and Path(tailored_path).suffix == ".txt" and Path(tailored_path).exists():
+        return Path(tailored_path).read_text(encoding="utf-8")
+
+    return fallback_resume
 
 
 # ── Prompt Builder (profile-driven) ──────────────────────────────────────
@@ -237,11 +254,7 @@ def run_cover_letters(min_score: int = 7, limit: int = 20,
     for job in jobs:
         completed += 1
         try:
-            tailored_path = job.get("tailored_resume_path")
-            if tailored_path and Path(tailored_path).exists():
-                job_resume = Path(tailored_path).read_text(encoding="utf-8")
-            else:
-                job_resume = resume_text
+            job_resume = _load_tailored_resume_text(job, profile, resume_text)
             letter = generate_cover_letter(
                 job_resume, job, profile, validation_mode=validation_mode
             )

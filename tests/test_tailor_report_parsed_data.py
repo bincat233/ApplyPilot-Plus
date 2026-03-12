@@ -17,7 +17,7 @@ def _profile() -> dict:
     }
 
 
-def test_tailor_report_keeps_last_parsed_json(monkeypatch) -> None:
+def test_tailor_resume_returns_parsed_json_but_omits_it_from_report(monkeypatch) -> None:
     parsed = {
         "title": "Software Engineer",
         "summary": "Practical engineer.",
@@ -44,7 +44,7 @@ def test_tailor_report_keeps_last_parsed_json(monkeypatch) -> None:
         },
     )
 
-    tailored_text, report = tailor.tailor_resume(
+    tailored_text, report, parsed_json = tailor.tailor_resume(
         resume_text="Base resume",
         job={"title": "Software Engineer", "site": "Example", "full_description": "Build APIs"},
         profile=_profile(),
@@ -52,6 +52,7 @@ def test_tailor_report_keeps_last_parsed_json(monkeypatch) -> None:
         validation_mode="normal",
     )
 
-    assert report["parsed_data"] == parsed
+    assert parsed_json == parsed
+    assert "parsed_data" not in report
     assert report["status"] == "failed_validation"
     assert "Example Co" in tailored_text

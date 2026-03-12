@@ -354,7 +354,7 @@ def judge_tailored_resume(
 def tailor_resume(
     resume_text: str, job: dict, profile: dict,
     max_retries: int = 3, validation_mode: str = "normal",
-) -> tuple[str, dict]:
+) -> tuple[str, dict, dict | None]:
     """Generate a tailored resume via JSON output + fresh context on each retry.
 
     Key design choices:
@@ -374,7 +374,8 @@ def tailor_resume(
                           lenient -- banned words ignored; LLM judge skipped
 
     Returns:
-        (tailored_text, report) where report contains validation details.
+        (tailored_text, report, parsed_json) where parsed_json is the last
+        successfully parsed structured resume, if any.
     """
     job_text = (
         f"TITLE: {job['title']}\n"
@@ -386,10 +387,10 @@ def tailor_resume(
     report: dict = {
         "attempts": 0, "validator": None, "judge": None,
         "status": "pending", "validation_mode": validation_mode,
-        "parsed_data": None,
     }
     avoid_notes: list[str] = []
     tailored = ""
+    last_data: dict | None = None
     client = get_client()
     tailor_prompt_base = _build_tailor_prompt(profile)
 
@@ -413,7 +414,7 @@ def tailor_resume(
         # Parse JSON from response
         try:
             data = extract_json(raw)
-            report["parsed_data"] = data
+            last_data = data
         except ValueError as exc:
             log.warning("Attempt %d JSON parse failed (%s). Raw response (first 500 chars):\n%s",
                         attempt + 1, exc, raw[:1000])
@@ -433,7 +434,7 @@ def tailor_resume(
             # Last attempt — assemble whatever we got
             tailored = assemble_resume_text(data, profile)
             report["status"] = "failed_validation"
-            return tailored, report
+            return tailored, report, last_data
 
         # Assemble text (header injected by code, em dashes auto-fixed)
         tailored = assemble_resume_text(data, profile)
@@ -442,7 +443,7 @@ def tailor_resume(
         if validation_mode == "lenient":
             report["judge"] = {"verdict": "SKIPPED", "passed": True, "issues": "none"}
             report["status"] = "approved"
-            return tailored, report
+            return tailored, report, last_data
 
         judge = judge_tailored_resume(resume_text, tailored, job.get("title", ""), profile)
         report["judge"] = judge
@@ -455,14 +456,14 @@ def tailor_resume(
                     continue
             # Accept best attempt on last retry (all modes) or if lenient
             report["status"] = "approved_with_judge_warning"
-            return tailored, report
+            return tailored, report, last_data
 
         # Both passed
         report["status"] = "approved"
-        return tailored, report
+        return tailored, report, last_data
 
     report["status"] = "exhausted_retries"
-    return tailored, report
+    return tailored, report, last_data
 
 
 # ── Batch Entry Point ────────────────────────────────────────────────────
@@ -507,17 +508,19 @@ def run_tailoring(min_score: int = 7, limit: int = 20,
             job["title"][:60],
         )
         try:
-            tailored, report = tailor_resume(resume_text, job, profile,
-                                             validation_mode=validation_mode)
+            tailored, report, parsed_json = tailor_resume(
+                resume_text, job, profile, validation_mode=validation_mode
+            )
 
             # Build safe filename prefix
             safe_title = re.sub(r"[^\w\s-]", "", job["title"])[:50].strip().replace(" ", "_")
             safe_site = re.sub(r"[^\w\s-]", "", job["site"])[:20].strip().replace(" ", "_")
             prefix = f"{safe_site}_{safe_title}"
 
-            # Save tailored resume text
-            txt_path = TAILORED_DIR / f"{prefix}.txt"
-            txt_path.write_text(tailored, encoding="utf-8")
+            # Save structured resume JSON as the canonical intermediate artifact.
+            json_path = TAILORED_DIR / f"{prefix}.json"
+            if parsed_json is not None:
+                json_path.write_text(json.dumps(parsed_json, indent=2), encoding="utf-8")
 
             # Save job description for traceability
             job_path = TAILORED_DIR / f"{prefix}_JOB.txt"
@@ -531,23 +534,26 @@ def run_tailoring(min_score: int = 7, limit: int = 20,
             )
             job_path.write_text(job_desc, encoding="utf-8")
 
-            # Save validation report
-            report_path = TAILORED_DIR / f"{prefix}_REPORT.json"
-            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-
-            # Generate PDF for approved resumes (best-effort)
-            # "approved_with_judge_warning" is also a success — resume was generated.
+            # Generate PDF for approved resumes (best-effort). The PDF is the
+            # final resume artifact; JSON is retained as the intermediate source.
             pdf_path = None
             if report["status"] in ("approved", "approved_with_judge_warning"):
                 try:
-                    from applypilot.scoring.pdf import convert_to_pdf
-                    pdf_path = str(convert_to_pdf(txt_path))
+                    from applypilot.scoring.pdf import convert_text_to_pdf
+
+                    pdf_path = str(convert_text_to_pdf(tailored, TAILORED_DIR / f"{prefix}.pdf"))
                 except Exception:
-                    log.debug("PDF generation failed for %s", txt_path, exc_info=True)
+                    log.debug("PDF generation failed for %s", json_path, exc_info=True)
+                    report["status"] = "error"
+
+            # Save validation/reporting metadata after final status is known.
+            report_path = TAILORED_DIR / f"{prefix}_REPORT.json"
+            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
             result = {
                 "url": job["url"],
-                "path": str(txt_path),
+                "path": pdf_path,
+                "json_path": str(json_path) if parsed_json is not None else None,
                 "pdf_path": pdf_path,
                 "title": job["title"],
                 "site": job["site"],
@@ -557,7 +563,7 @@ def run_tailoring(min_score: int = 7, limit: int = 20,
         except Exception as e:
             result = {
                 "url": job["url"], "title": job["title"], "site": job["site"],
-                "status": "error", "attempts": 0, "path": None, "pdf_path": None,
+                "status": "error", "attempts": 0, "path": None, "json_path": None, "pdf_path": None,
             }
             log.error("%d/%d [ERROR] %s -- %s", completed, len(jobs), job["title"][:40], e)
 
@@ -582,8 +588,9 @@ def run_tailoring(min_score: int = 7, limit: int = 20,
         if r["status"] in _success_statuses:
             conn.execute(
                 "UPDATE jobs SET tailored_resume_path=?, tailored_at=?, "
+                "tailored_resume_json_path=?, "
                 "tailor_attempts=COALESCE(tailor_attempts,0)+1 WHERE url=?",
-                (r["path"], now, r["url"]),
+                (r["path"], now, r["json_path"], r["url"]),
             )
         else:
             conn.execute(

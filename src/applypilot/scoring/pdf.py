@@ -401,6 +401,33 @@ def convert_to_pdf(
     return out
 
 
+def convert_text_to_pdf(
+    text: str, output_path: Path, html_only: bool = False
+) -> Path:
+    """Convert resume text already held in memory to PDF.
+
+    Args:
+        text: Structured resume/cover-letter text.
+        output_path: Destination path for the generated PDF/HTML.
+        html_only: If True, emit HTML instead of PDF.
+
+    Returns:
+        Path to the generated PDF (or HTML) file.
+    """
+    resume = parse_resume(text)
+    html = build_html(resume)
+
+    out = Path(output_path)
+    if html_only:
+        out.write_text(html, encoding="utf-8")
+        log.info("HTML generated: %s", out)
+        return out
+
+    render_pdf(html, str(out))
+    log.info("PDF generated: %s", out)
+    return out
+
+
 def batch_convert(limit: int = 50) -> int:
     """Convert .txt files in TAILORED_DIR that don't have corresponding PDFs.
 

@@ -123,6 +123,7 @@ def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
 
             -- Tailoring stage (resume tailor)
             tailored_resume_path  TEXT,
+            tailored_resume_json_path TEXT,
             tailored_at           TEXT,
             tailor_attempts       INTEGER DEFAULT 0,
 
@@ -175,6 +176,7 @@ _ALL_COLUMNS: dict[str, str] = {
     "scored_at": "TEXT",
     # Tailoring
     "tailored_resume_path": "TEXT",
+    "tailored_resume_json_path": "TEXT",
     "tailored_at": "TEXT",
     "tailor_attempts": "INTEGER DEFAULT 0",
     # Cover letter
