@@ -149,6 +149,60 @@ def run(
 
 
 @app.command()
+def add_url(
+    url: str = typer.Argument(..., help="Job URL to insert or update."),
+    title: str = typer.Option("Manual Add", "--title", help="Job title."),
+    site: str = typer.Option("Manual", "--site", help="Source site label."),
+    location: Optional[str] = typer.Option(None, "--location", help="Job location."),
+    description: Optional[str] = typer.Option(None, "--description", help="Short description."),
+    application_url: Optional[str] = typer.Option(None, "--application-url", help="Direct apply URL (defaults to URL)."),
+    strategy: str = typer.Option("manual_url", "--strategy", help="Discovery strategy label."),
+) -> None:
+    """Insert or update a single job URL in the database."""
+    _bootstrap()
+
+    from datetime import datetime, timezone
+    from applypilot.database import get_connection
+
+    now = datetime.now(timezone.utc).isoformat()
+    apply_url = application_url or url
+    conn = get_connection()
+
+    exists = conn.execute("SELECT 1 FROM jobs WHERE url = ?", (url,)).fetchone() is not None
+
+    if exists:
+        conn.execute(
+            """
+            UPDATE jobs
+            SET title = COALESCE(NULLIF(?, ''), title),
+                site = COALESCE(NULLIF(?, ''), site),
+                location = COALESCE(?, location),
+                description = COALESCE(?, description),
+                application_url = COALESCE(?, application_url),
+                strategy = COALESCE(NULLIF(?, ''), strategy),
+                discovered_at = COALESCE(discovered_at, ?)
+            WHERE url = ?
+            """,
+            (title, site, location, description, apply_url, strategy, now, url),
+        )
+        action = "Updated"
+    else:
+        conn.execute(
+            """
+            INSERT INTO jobs (
+                url, title, salary, description, location, site, strategy, discovered_at, application_url
+            ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)
+            """,
+            (url, title, description, location, site, strategy, now, apply_url),
+        )
+        action = "Added"
+
+    conn.commit()
+    console.print(f"[green]{action} job:[/green] {url}")
+    console.print(f"  Site: {site} | Title: {title}")
+
+
+@app.command()
 def apply(
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Max applications to submit."),
     workers: int = typer.Option(1, "--workers", "-w", help="Number of parallel browser workers."),

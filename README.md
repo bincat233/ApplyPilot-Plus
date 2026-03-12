@@ -172,6 +172,7 @@ The Playwright MCP server is configured automatically at runtime per worker. No 
 
 ```bash
 # Utility modes (no Chrome/Claude needed)
+applypilot add-url URL                 # insert or update one job manually
 applypilot apply --mark-applied URL    # manually mark a job as applied
 applypilot apply --mark-failed URL     # manually mark a job as failed
 applypilot apply --reset-failed        # reset all failed jobs for retry
@@ -193,6 +194,7 @@ applypilot run --dry-run                # Preview without executing
 applypilot run discover --site-filter Lensa  # Only run smart extract for matching sites
 applypilot run --validation lenient     # Relax validation (recommended for Gemini free tier)
 applypilot run --validation strict      # Strictest validation (retries on any banned word)
+applypilot add-url URL                  # Add or update a job by URL
 applypilot apply                        # Launch auto-apply
 applypilot apply --workers 3            # Parallel browser workers
 applypilot apply --dry-run              # Fill forms without submitting
