@@ -205,7 +205,8 @@ applypilot apply --gen --url URL       # generate prompt file for manual debuggi
 ```
 applypilot init                         # First-time setup wizard
 applypilot doctor                       # Verify setup, diagnose missing requirements
-applypilot --log-level info --http-log-level warning  # Control app vs HTTP log verbosity
+applypilot --log-level info run tailor               # Normal business progress, HTTP noise hidden
+applypilot --log-level debug run tailor              # Include HTTP/SDK request details for debugging
 applypilot --log-file ~/.applypilot/run.log status    # Mirror logs to a file explicitly
 applypilot run [stages...]              # Run pipeline stages (or 'all')
 applypilot run --workers 4              # Parallel discovery/enrichment

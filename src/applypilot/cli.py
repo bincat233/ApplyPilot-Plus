@@ -23,12 +23,11 @@ def _parse_log_level(value: str) -> int:
 
 def _configure_logging(
     level: str = "INFO",
-    http_level: str = "WARNING",
     log_file: Path | None = None,
 ) -> None:
     """Set consistent logging output for CLI runs."""
     root_level = _parse_log_level(level)
-    noisy_level = _parse_log_level(http_level)
+    noisy_level = logging.INFO if root_level <= logging.DEBUG else logging.WARNING
     logging.basicConfig(
         level=root_level,
         format="%(asctime)s - %(levelname)s - %(message)s",
@@ -45,8 +44,8 @@ def _configure_logging(
         )
         logging.getLogger().addHandler(file_handler)
 
-    # Keep SDK/network internals quiet by default; make them opt-in via
-    # --http-log-level debug/info when needed.
+    # Keep SDK/network internals quiet by default. When the user opts into
+    # debug logging, expose HTTP/SDK request details too.
     for name in ("LiteLLM", "litellm", "httpx", "httpcore", "openai"):
         noisy = logging.getLogger(name)
         noisy.setLevel(noisy_level)
@@ -139,11 +138,6 @@ def main(
         "--log-level",
         help="Application log level: debug, info, warning, error, critical.",
     ),
-    http_log_level: str = typer.Option(
-        "warning",
-        "--http-log-level",
-        help="HTTP/SDK log level: debug, info, warning, error, critical.",
-    ),
     log_file: Optional[Path] = typer.Option(
         None,
         "--log-file",
@@ -151,7 +145,7 @@ def main(
     ),
 ) -> None:
     """ApplyPilot — AI-powered end-to-end job application pipeline."""
-    _configure_logging(level=log_level, http_level=http_log_level, log_file=log_file)
+    _configure_logging(level=log_level, log_file=log_file)
 
 
 @app.command()

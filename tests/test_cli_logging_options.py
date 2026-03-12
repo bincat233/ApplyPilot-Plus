@@ -15,10 +15,17 @@ def test_parse_log_level_accepts_standard_levels() -> None:
     assert cli._parse_log_level("WARNING") == logging.WARNING
 
 
+def test_configure_logging_treats_http_as_debug_noise() -> None:
+    cli._configure_logging(level="info")
+    assert logging.getLogger("httpx").level == logging.WARNING
+
+    cli._configure_logging(level="debug")
+    assert logging.getLogger("httpx").level == logging.INFO
+
+
 def test_root_help_includes_logging_options() -> None:
     result = runner.invoke(cli.app, ["--help"])
 
     assert result.exit_code == 0
     assert "--log-level" in result.output
-    assert "--http-log-level" in result.output
     assert "--log-file" in result.output
