@@ -88,6 +88,7 @@ def run(
     stream: bool = typer.Option(False, "--stream", help="Run stages concurrently (streaming mode)."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview stages without executing."),
     show_browser: bool = typer.Option(False, "--show-browser", help="Show browser window during enrichment."),
+    reset_enrich_errors: bool = typer.Option(False, "--reset-enrich-errors", help="Clear enrichment errors so failed jobs are retried."),
     site_filter: Optional[list[str]] = typer.Option(
         None,
         "--site-filter",
@@ -119,6 +120,17 @@ def run(
                 f"Valid stages: {', '.join(VALID_STAGES)}, all"
             )
             raise typer.Exit(code=1)
+
+    if reset_enrich_errors:
+        from applypilot.database import get_connection
+
+        conn = get_connection()
+        result_reset = conn.execute(
+            "UPDATE jobs SET detail_scraped_at = NULL, detail_error = NULL "
+            "WHERE detail_error IS NOT NULL"
+        )
+        conn.commit()
+        console.print(f"[cyan]Reset {result_reset.rowcount} enrichment error job(s) for retry.[/cyan]")
 
     # Gate AI stages behind Tier 2
     llm_stages = {"score", "tailor", "cover"}
