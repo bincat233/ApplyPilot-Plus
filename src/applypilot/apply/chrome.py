@@ -25,6 +25,15 @@ _chrome_procs: dict[int, subprocess.Popen] = {}
 _chrome_lock = threading.Lock()
 
 
+def _normalize_profile_directory(profile_directory: str | None) -> str:
+    profile = (profile_directory or "").strip()
+    if not profile:
+        return "Default"
+    if "/" in profile or "\\" in profile or profile in {".", ".."}:
+        raise ValueError("Chrome profile directory must be a simple directory name like 'Default' or 'Profile 1'.")
+    return profile
+
+
 # ---------------------------------------------------------------------------
 # Cross-platform process helpers
 # ---------------------------------------------------------------------------
@@ -97,7 +106,7 @@ def _kill_on_port(port: int) -> None:
 # Worker profile management
 # ---------------------------------------------------------------------------
 
-def setup_worker_profile(worker_id: int) -> Path:
+def setup_worker_profile(worker_id: int, profile_directory: str | None = None) -> Path:
     """Create an isolated Chrome profile for a worker.
 
     On first run, clones from an existing worker profile (preferred, since
@@ -110,8 +119,11 @@ def setup_worker_profile(worker_id: int) -> Path:
     Returns:
         Path to the worker's Chrome user-data directory.
     """
+    selected_profile = _normalize_profile_directory(
+        profile_directory or config.get_chrome_profile_directory()
+    )
     profile_dir = config.CHROME_WORKER_DIR / f"worker-{worker_id}"
-    if (profile_dir / "Default").exists():
+    if (profile_dir / selected_profile).exists():
         return profile_dir  # Already initialized
 
     # Find a source: prefer existing worker (has session cookies), else user profile
@@ -120,7 +132,7 @@ def setup_worker_profile(worker_id: int) -> Path:
         if wid == worker_id:
             continue
         candidate = config.CHROME_WORKER_DIR / f"worker-{wid}"
-        if (candidate / "Default").exists():
+        if (candidate / selected_profile).exists():
             source = candidate
             break
     if source is None:
@@ -159,13 +171,13 @@ def setup_worker_profile(worker_id: int) -> Path:
     return profile_dir
 
 
-def _suppress_restore_nag(profile_dir: Path) -> None:
+def _suppress_restore_nag(profile_dir: Path, profile_directory: str | None = None) -> None:
     """Clear Chrome's 'restore pages' nag by fixing Preferences.
 
     Chrome writes exit_type=Crashed when killed, which triggers a
     'Restore pages?' prompt on next launch. This patches it out.
     """
-    prefs_file = profile_dir / "Default" / "Preferences"
+    prefs_file = profile_dir / _normalize_profile_directory(profile_directory) / "Preferences"
     if not prefs_file.exists():
         return
 
@@ -187,7 +199,8 @@ def _suppress_restore_nag(profile_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def launch_chrome(worker_id: int, port: int | None = None,
-                  headless: bool = False) -> subprocess.Popen:
+                  headless: bool = False,
+                  profile_directory: str | None = None) -> subprocess.Popen:
     """Launch a Chrome instance with remote debugging for a worker.
 
     Args:
@@ -201,13 +214,16 @@ def launch_chrome(worker_id: int, port: int | None = None,
     if port is None:
         port = BASE_CDP_PORT + worker_id
 
-    profile_dir = setup_worker_profile(worker_id)
+    selected_profile = _normalize_profile_directory(
+        profile_directory or config.get_chrome_profile_directory()
+    )
+    profile_dir = setup_worker_profile(worker_id, profile_directory=selected_profile)
 
     # Kill any zombie Chrome from a previous run on this port
     _kill_on_port(port)
 
     # Patch preferences to suppress restore nag
-    _suppress_restore_nag(profile_dir)
+    _suppress_restore_nag(profile_dir, profile_directory=selected_profile)
 
     chrome_exe = config.get_chrome_path()
 
@@ -215,7 +231,7 @@ def launch_chrome(worker_id: int, port: int | None = None,
         chrome_exe,
         f"--remote-debugging-port={port}",
         f"--user-data-dir={profile_dir}",
-        "--profile-directory=Default",
+        f"--profile-directory={selected_profile}",
         "--no-first-run",
         "--no-default-browser-check",
         "--window-size=1024,768",

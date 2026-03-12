@@ -141,6 +141,8 @@ Job search queries, target titles, locations, boards. Run multiple searches with
 ### `.env`
 API keys and runtime config: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `LLM_URL`, optional `LLM_MODEL`, optional `LLM_API_KEY`, and `CAPSOLVER_API_KEY`.
 
+For auto-apply, you can also set `CHROME_PROFILE_DIRECTORY` (for example `Profile 1`) if your logged-in Chrome session is not stored under `Default`.
+
 ### Package configs (shipped with ApplyPilot-Plus)
 - `config/employers.yaml` - Workday employer registry (48 preconfigured)
 - `config/sites.yaml` - Direct career sites (31+), blocked sites, base URLs, manual ATS domains

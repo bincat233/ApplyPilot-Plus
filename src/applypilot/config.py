@@ -1,5 +1,6 @@
 """ApplyPilot configuration: paths, platform detection, user data."""
 
+import json
 import os
 import platform
 import shutil
@@ -83,6 +84,31 @@ def get_chrome_user_data() -> Path:
         return Path.home() / "Library" / "Application Support" / "Google" / "Chrome"
     else:
         return Path.home() / ".config" / "google-chrome"
+
+
+def get_chrome_profile_directory() -> str:
+    """Choose which Chrome profile directory to clone and launch.
+
+    Priority:
+    1) CHROME_PROFILE_DIRECTORY environment variable
+    2) Chrome Local State profile.last_used
+    3) "Default"
+    """
+    env_profile = (os.environ.get("CHROME_PROFILE_DIRECTORY") or "").strip()
+    if env_profile:
+        return env_profile
+
+    local_state_path = get_chrome_user_data() / "Local State"
+    if local_state_path.exists():
+        try:
+            data = json.loads(local_state_path.read_text(encoding="utf-8"))
+            last_used = (data.get("profile", {}) or {}).get("last_used")
+            if isinstance(last_used, str) and last_used.strip():
+                return last_used.strip()
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return "Default"
 
 
 def ensure_dirs():
