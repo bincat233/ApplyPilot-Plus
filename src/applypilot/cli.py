@@ -14,6 +14,29 @@ from rich.table import Table
 from applypilot import __version__
 
 
+class _ColorFormatter(logging.Formatter):
+    """Colorize log levels for terminal output only."""
+
+    _RESET = "\033[0m"
+    _LEVEL_COLORS = {
+        logging.DEBUG: "\033[36m",      # cyan
+        logging.INFO: "\033[32m",       # green
+        logging.WARNING: "\033[33m",    # yellow
+        logging.ERROR: "\033[31m",      # red
+        logging.CRITICAL: "\033[1;31m", # bold red
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        original = record.levelname
+        color = self._LEVEL_COLORS.get(record.levelno)
+        if color:
+            record.levelname = f"{color}{original}{self._RESET}"
+        try:
+            return super().format(record)
+        finally:
+            record.levelname = original
+
+
 def _parse_log_level(value: str) -> int:
     level = getattr(logging, value.upper(), None)
     if not isinstance(level, int):
@@ -28,12 +51,12 @@ def _configure_logging(
     """Set consistent logging output for CLI runs."""
     root_level = _parse_log_level(level)
     noisy_level = logging.INFO if root_level <= logging.DEBUG else logging.WARNING
-    logging.basicConfig(
-        level=root_level,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%H:%M:%S",
-        force=True,
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(root_level)
+    console_handler.setFormatter(
+        _ColorFormatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S")
     )
+    logging.basicConfig(level=root_level, handlers=[console_handler], force=True)
 
     if log_file is not None:
         log_file.parent.mkdir(parents=True, exist_ok=True)
