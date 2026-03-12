@@ -201,6 +201,10 @@ applypilot dashboard                    # Open HTML results dashboard
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and PR guidelines.
 
+## Upstream Contributions Merged Here
+
+- [#31](https://github.com/Pickle-Pixel/ApplyPilot/pull/31) by [@vivekshekharrai-del](https://github.com/vivekshekharrai-del): Fix UnicodeEncodeError in `doctor` on Windows
+
 ---
 
 ## License
