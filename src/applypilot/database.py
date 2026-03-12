@@ -59,6 +59,17 @@ def close_connection(db_path: Path | str | None = None) -> None:
             conn.close()
 
 
+def close_all_connections() -> None:
+    """Close all cached connections for the current thread."""
+    if hasattr(_local, "connections"):
+        for _path, conn in list(_local.connections.items()):
+            try:
+                conn.close()
+            except Exception:
+                pass
+        _local.connections.clear()
+
+
 def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
     """Create the full jobs table with all columns from every pipeline stage.
 
@@ -343,7 +354,7 @@ def store_jobs(conn: sqlite3.Connection, jobs: list[dict],
     new = 0
     existing = 0
 
-    for job in jobs:
+    for i, job in enumerate(jobs):
         url = job.get("url")
         if not url:
             continue
@@ -357,6 +368,10 @@ def store_jobs(conn: sqlite3.Connection, jobs: list[dict],
             new += 1
         except sqlite3.IntegrityError:
             existing += 1
+
+        # Reduce data loss risk if a large discovery batch is interrupted.
+        if (i + 1) % 50 == 0:
+            conn.commit()
 
     conn.commit()
     return new, existing
