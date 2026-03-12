@@ -277,15 +277,17 @@ def assemble_resume_text(data: dict, profile: dict) -> str:
             lines.append(f"- {sanitize_text(b)}")
         lines.append("")
 
-    # Projects
-    lines.append("PROJECTS")
-    for entry in data.get("projects", []):
-        lines.append(sanitize_text(entry.get("header", "")))
-        if entry.get("subtitle"):
-            lines.append(sanitize_text(entry["subtitle"]))
-        for b in entry.get("bullets", []):
-            lines.append(f"- {sanitize_text(b)}")
-        lines.append("")
+    # Projects are optional for some roles/resume styles.
+    projects = data.get("projects", [])
+    if projects:
+        lines.append("PROJECTS")
+        for entry in projects:
+            lines.append(sanitize_text(entry.get("header", "")))
+            if entry.get("subtitle"):
+                lines.append(sanitize_text(entry["subtitle"]))
+            for b in entry.get("bullets", []):
+                lines.append(f"- {sanitize_text(b)}")
+            lines.append("")
 
     # Education
     lines.append("EDUCATION")

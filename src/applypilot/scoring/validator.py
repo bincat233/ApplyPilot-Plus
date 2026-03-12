@@ -68,7 +68,7 @@ FABRICATION_WATCHLIST: set[str] = {
     "certif", "certified", "pmp", "scrum master", "aws certified",
 }
 
-REQUIRED_SECTIONS: set[str] = {"SUMMARY", "TECHNICAL SKILLS", "EXPERIENCE", "PROJECTS", "EDUCATION"}
+REQUIRED_SECTIONS: set[str] = {"SUMMARY", "TECHNICAL SKILLS", "EXPERIENCE", "EDUCATION"}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -113,13 +113,12 @@ def validate_json_fields(data: dict, profile: dict, mode: str = "normal") -> dic
     errors: list[str] = []
     warnings: list[str] = []
 
-    # Required keys — always checked regardless of mode
-    # "projects" may be an empty list (model may drop all projects for some jobs)
+    # Required keys — always checked regardless of mode.
+    # "projects" is optional because some tailored resumes legitimately omit
+    # a projects section for roles where it adds little value.
     for key in ("title", "summary", "skills", "experience", "education"):
         if key not in data or not data[key]:
             errors.append(f"Missing required field: {key}")
-    if "projects" not in data:
-        errors.append("Missing required field: projects")
     if errors:
         return {"passed": False, "errors": errors, "warnings": warnings}
 
@@ -152,7 +151,7 @@ def validate_json_fields(data: dict, profile: dict, mode: str = "normal") -> dic
                 all_text_parts.append(b)
 
     # Projects: collect bullets
-    if isinstance(data["projects"], list):
+    if isinstance(data.get("projects"), list):
         for entry in data["projects"]:
             for b in entry.get("bullets", []):
                 all_text_parts.append(b)
@@ -210,7 +209,6 @@ def validate_tailored_resume(text: str, profile: dict, original_text: str = "") 
         "SUMMARY": ["summary", "professional summary", "profile"],
         "TECHNICAL SKILLS": ["technical skills", "skills", "tech stack", "core skills", "technologies"],
         "EXPERIENCE": ["experience", "work experience", "professional experience"],
-        "PROJECTS": ["projects", "personal projects", "key projects", "selected projects"],
         "EDUCATION": ["education", "academic background"],
     }
     for section, variants in section_variants.items():
