@@ -39,4 +39,5 @@ export PYTHONPATH=src
 ## Notes
 - If local code and installed package behavior differ, prefer `PYTHONPATH=src`.
 - PDF generation depends on Playwright / Chromium being installed.
+- For simple database inspection or updates, prefer `sqlite3` over ad hoc Python scripts.
 - Add a short artifact-flow summary here later, but only after the current JSON/PDF pipeline has stabilized.
