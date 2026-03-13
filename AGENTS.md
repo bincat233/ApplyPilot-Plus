@@ -39,3 +39,4 @@ export PYTHONPATH=src
 ## Notes
 - If local code and installed package behavior differ, prefer `PYTHONPATH=src`.
 - PDF generation depends on Playwright / Chromium being installed.
+- Add a short artifact-flow summary here later, but only after the current JSON/PDF pipeline has stabilized.
